@@ -1,8 +1,27 @@
 package llm
 
-import "fmt"
+import (
+	"math/rand"
+	"time"
 
-func ExtractEntities(transcript string) (string, error) {
-	fmt.Printf("[LLM] Extracting entities from transcript...\n")
-	return fmt.Sprintf("Fake structured entities from: %s", transcript), nil
+	"github.com/gavmor/podpedia/internal/types"
+)
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func ExtractEntities(ep types.Episode) (types.EncyclopediaEntry, error) {
+	// Simulate LLM inference time
+	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1500)+1000))
+
+	return types.EncyclopediaEntry{
+		EpisodeID: ep.ID,
+		Guests: []types.Guest{
+			{Name: "Jane Doe", Background: "AI Researcher", Ideology: "Open Source AI"},
+		},
+		Companies: []types.Company{
+			{Name: "Acme Corp", BusinessModel: "B2B SaaS", Customers: "Enterprise Developers"},
+		},
+	}, nil
 }

@@ -1,8 +1,17 @@
 package transcription
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
 
-func Transcribe(episodeID string) (string, error) {
-	fmt.Printf("[Transcription] Transcribing episode: %s\n", episodeID)
-	return fmt.Sprintf("Fake transcript for %s", episodeID), nil
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func Transcribe(audioURL string) (string, error) {
+	// Simulate processing time
+	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)+500))
+	return fmt.Sprintf("Raw transcript for %s: This is a podcast episode discussing AI and SaaS models...", audioURL), nil
 }
