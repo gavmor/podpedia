@@ -1,6 +1,6 @@
 module github.com/gavmor/podpedia
 
-go 1.25.0
+go 1.23.0
 
 require (
 	code.cloudfoundry.org/lager/v3 v3.66.0
