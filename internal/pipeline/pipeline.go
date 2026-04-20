@@ -14,8 +14,8 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-func Run(rssURL string) error {
-	fmt.Printf("[Pipeline] Starting for feed: %s\n", rssURL)
+func Run(rssURL string, outputDir string) error {
+	fmt.Printf("[Pipeline] Starting for feed: %s (Output: %s)\n", rssURL, outputDir)
 
 	_, episodes, err := parseRSSWithGofeed(rssURL)
 	if err != nil {
@@ -42,7 +42,7 @@ func Run(rssURL string) error {
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			processEpisode(episode)
+			processEpisode(episode, outputDir)
 		}(ep)
 	}
 
@@ -51,7 +51,7 @@ func Run(rssURL string) error {
 	return nil
 }
 
-func processEpisode(ep types.Episode) {
+func processEpisode(ep types.Episode, outputDir string) {
 	fmt.Printf("[Worker] Starting Episode: %s\n", ep.Title)
 
 	if ep.Transcript == "" {
@@ -69,10 +69,10 @@ func processEpisode(ep types.Episode) {
 		return
 	}
 
-	if err := storage.SaveRawData(ep); err != nil {
+	if err := storage.SaveRawData(outputDir, ep); err != nil {
 		fmt.Printf("[Worker] ERROR: Failed to save raw data for %s: %v\n", ep.ID, err)
 	}
-	if err := storage.SaveStructuredData(entry); err != nil {
+	if err := storage.SaveStructuredData(outputDir, entry); err != nil {
 		fmt.Printf("[Worker] ERROR: Failed to save structured data for %s: %v\n", entry.EpisodeID, err)
 	}
 

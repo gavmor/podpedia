@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	rssURL string
+	rssURL    string
+	outputDir string
 )
 
 var runCmd = &cobra.Command{
@@ -22,7 +23,7 @@ var runCmd = &cobra.Command{
 			fmt.Println("Error: RSS feed URL is required. Use --url or -u")
 			return
 		}
-		if err := pipeline.Run(rssURL); err != nil {
+		if err := pipeline.Run(rssURL, outputDir); err != nil {
 			fmt.Printf("Pipeline error: %v\n", err)
 			os.Exit(1)
 		}
@@ -31,6 +32,7 @@ var runCmd = &cobra.Command{
 
 func init() {
 	runCmd.Flags().StringVarP(&rssURL, "url", "u", "", "URL of the podcast RSS feed")
+	runCmd.Flags().StringVarP(&outputDir, "output", "o", "output", "Directory to save processed data")
 	runCmd.MarkFlagRequired("url")
 	rootCmd.AddCommand(runCmd)
 }

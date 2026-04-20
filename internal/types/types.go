@@ -1,7 +1,5 @@
 package types
 
-import "encoding/xml"
-
 // Podcast represents the high-level metadata of a podcast feed
 type Podcast struct {
 	Title       string   `xml:"title"`
