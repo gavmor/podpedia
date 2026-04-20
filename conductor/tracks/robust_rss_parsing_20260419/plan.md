@@ -2,9 +2,9 @@
 
 ## Phase 1: Dependency & Schema Updates
 - [x] Task: Add \`github.com/mmcdole/gofeed\` to \`go.mod\` 484f192
-- [ ] Task: Extend `internal/types` with new metadata fields
-    - [ ] Update `Podcast` struct to include Author and Categories
-    - [ ] Update `Episode` struct to include Author, Duration, and Explicit flag
+- [x] Task: Extend \`internal/types\` with new metadata fields 484f192
+    - [x] Update \`Podcast\` struct to include Author and Categories c9a2cb7
+    - [x] Update \`Episode\` struct to include Author, Duration, and Explicit flag c9a2cb7
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Dependency & Schema Updates' (Protocol in workflow.md)
 
 ## Phase 2: Gofeed Integration
