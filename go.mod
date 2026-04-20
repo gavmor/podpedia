@@ -6,6 +6,7 @@ require github.com/spf13/cobra v1.10.2
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
+	github.com/alitto/pond v1.9.2 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

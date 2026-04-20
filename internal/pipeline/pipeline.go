@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"sync"
 	"time"
+
+	"github.com/alitto/pond"
 
 	"github.com/gavmor/podpedia/internal/llm"
 	"github.com/gavmor/podpedia/internal/storage"
@@ -29,24 +30,19 @@ func Run(rssURL string, outputDir string) error {
 		// In a real app, you'd parse this to int.
 	}
 	
-	semaphore := make(chan struct{}, maxConcurrentWorkers)
-	var wg sync.WaitGroup
+	pool := pond.New(maxConcurrentWorkers, 0, pond.IdleTimeout(10*time.Second))
+	defer pool.StopAndWait()
 
 	startTime := time.Now()
 
 	for _, ep := range episodes {
-		wg.Add(1)
-		go func(episode types.Episode) {
-			defer wg.Done()
-
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
+		episode := ep
+		pool.Submit(func() {
 			processEpisode(episode, outputDir)
-		}(ep)
+		})
 	}
 
-	wg.Wait()
+	pool.StopAndWait()
 	fmt.Printf("\n[Pipeline] Completed in %v\n", time.Since(startTime))
 	return nil
 }
