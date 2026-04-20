@@ -1,57 +1,51 @@
-package types
+package types_test
 
 import (
 	"encoding/xml"
-	"testing"
+
+	. "github.com/gavmor/podpedia/internal/types"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestMetadataStructures(t *testing.T) {
-	// Test data representing a typical podcast RSS item
-	xmlInput := `
-		<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
-			<channel>
-				<title>Test Podcast</title>
-				<description>A podcast about testing</description>
-				<item>
-					<title>Episode 1</title>
-					<description>The first episode</description>
-					<pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
-					<enclosure url="http://example.com/e1.mp3" type="audio/mpeg" length="123456"/>
-					<guid>e1-guid</guid>
-				</item>
-			</channel>
-		</rss>
-	`
+var _ = Describe("Types", func() {
+	Describe("Episode", func() {
+		Context("when unmarshaling from XML", func() {
+			var (
+				xmlInput []byte
+				ep       Episode
+			)
 
-	// This test defines what we expect our structures to handle
-	type RSS struct {
-		XMLName xml.Name `xml:"rss"`
-		Channel struct {
-			Title       string    `xml:"title"`
-			Description string    `xml:"description"`
-			Episodes    []Episode `xml:"item"`
-		} `xml:"channel"`
-	}
+			BeforeEach(func() {
+				xmlInput = []byte(`
+					<item>
+						<title>Episode 1</title>
+						<description>The first episode</description>
+						<pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
+						<guid>e1-guid</guid>
+					</item>
+				`)
+			})
 
-	var rss RSS
-	err := xml.Unmarshal([]byte(xmlInput), &rss)
-	if err != nil {
-		t.Fatalf("Failed to unmarshal XML: %v", err)
-	}
+			JustBeforeEach(func() {
+				err := xml.Unmarshal(xmlInput, &ep)
+				Expect(err).NotTo(HaveOccurred())
+			})
 
-	if rss.Channel.Title != "Test Podcast" {
-		t.Errorf("Expected podcast title 'Test Podcast', got '%s'", rss.Channel.Title)
-	}
+			It("correctly parses the basic fields", func() {
+				Expect(ep.Title).To(Equal("Episode 1"))
+				Expect(ep.Description).To(Equal("The first episode"))
+				Expect(ep.ID).To(Equal("e1-guid"))
+				Expect(ep.PubDate).To(Equal("Mon, 01 Jan 2024 00:00:00 +0000"))
+			})
 
-	if len(rss.Channel.Episodes) != 1 {
-		t.Fatalf("Expected 1 episode, got %d", len(rss.Channel.Episodes))
-	}
-
-	ep := rss.Channel.Episodes[0]
-	if ep.Title != "Episode 1" {
-		t.Errorf("Expected episode title 'Episode 1', got '%s'", ep.Title)
-	}
-
-	// AudioURL is marked as xml:"-" because gofeed handles enclosures differently.
-	// Manual unmarshaling won't populate it.
-}
+			It("initializes secondary fields as empty", func() {
+				// These are not in the XML item tag directly or marked as ignored
+				Expect(ep.AudioURL).To(BeEmpty())
+				Expect(ep.Author).To(BeEmpty())
+				Expect(ep.Duration).To(BeEmpty())
+				Expect(ep.Explicit).To(BeFalse())
+			})
+		})
+	})
+})

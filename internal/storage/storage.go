@@ -8,7 +8,13 @@ import (
 	"github.com/gavmor/podpedia/internal/types"
 )
 
-func SaveRawData(outputDir string, ep types.Episode) error {
+type Store struct{}
+
+func NewStore() *Store {
+	return &Store{}
+}
+
+func (s *Store) SaveRawData(outputDir string, ep types.Episode) error {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return err
 	}
@@ -16,7 +22,7 @@ func SaveRawData(outputDir string, ep types.Episode) error {
 	return os.WriteFile(fmt.Sprintf("%s/%s_raw.txt", outputDir, ep.ID), []byte(ep.Transcript), 0644)
 }
 
-func SaveStructuredData(outputDir string, entry types.EncyclopediaEntry) error {
+func (s *Store) SaveStructuredData(outputDir string, entry types.EncyclopediaEntry) error {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return err
 	}
@@ -27,3 +33,4 @@ func SaveStructuredData(outputDir string, entry types.EncyclopediaEntry) error {
 	}
 	return os.WriteFile(fmt.Sprintf("%s/%s_entry.json", outputDir, entry.EpisodeID), jsonData, 0644)
 }
+

@@ -10,8 +10,14 @@ import (
 	"github.com/cavaliergopher/grab/v3"
 )
 
+type Downloader struct{}
+
+func NewDownloader() *Downloader {
+	return &Downloader{}
+}
+
 // DownloadAudio downloads an audio file concurrently and robustly using the grab library.
-func DownloadAudio(url string, dest string) error {
+func (d *Downloader) DownloadAudio(url string, dest string) error {
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
@@ -24,8 +30,8 @@ func DownloadAudio(url string, dest string) error {
 	return nil
 }
 
-// GetAudioMetadata fetches the file size and checks for Range request support using an HTTP HEAD request.
-func GetAudioMetadata(url string) (int64, bool, error) {
+// FetchMetadata fetches the file size and checks for Range request support using an HTTP HEAD request.
+func (d *Downloader) FetchMetadata(url string) (int64, bool, error) {
 	resp, err := http.Head(url)
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to execute HEAD request: %w", err)

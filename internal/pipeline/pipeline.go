@@ -6,31 +6,68 @@ import (
 	"runtime"
 	"time"
 
+	"code.cloudfoundry.org/lager/v3"
 	"github.com/alitto/pond"
-
-	"github.com/gavmor/podpedia/internal/llm"
-	"github.com/gavmor/podpedia/internal/storage"
-	"github.com/gavmor/podpedia/internal/transcription"
 	"github.com/gavmor/podpedia/internal/types"
 	"github.com/mmcdole/gofeed"
 )
 
-func Run(rssURL string, outputDir string) error {
-	fmt.Printf("[Pipeline] Starting for feed: %s (Output: %s)\n", rssURL, outputDir)
+// Consumer-driven interfaces
+type Transcriber interface {
+	Transcribe(audioURL string) (string, error)
+}
 
-	_, episodes, err := parseRSSWithGofeed(rssURL)
+type Extractor interface {
+	ExtractEntities(ep types.Episode) (types.EncyclopediaEntry, error)
+}
+
+type AudioDownloader interface {
+	DownloadAudio(url string, dest string) error
+}
+
+type Store interface {
+	SaveRawData(outputDir string, ep types.Episode) error
+	SaveStructuredData(outputDir string, entry types.EncyclopediaEntry) error
+}
+
+type Pipeline struct {
+	logger       lager.Logger
+	transcriber  Transcriber
+	extractor    Extractor
+	downloader   AudioDownloader
+	store        Store
+	maxWorkers   int
+}
+
+func NewPipeline(
+	logger lager.Logger,
+	transcriber Transcriber,
+	extractor Extractor,
+	downloader AudioDownloader,
+	store Store,
+) *Pipeline {
+	return &Pipeline{
+		logger:      logger,
+		transcriber: transcriber,
+		extractor:   extractor,
+		downloader:  downloader,
+		store:       store,
+		maxWorkers:  runtime.NumCPU(),
+	}
+}
+
+func (p *Pipeline) Run(rssURL string, outputDir string) error {
+	p.logger.Info("starting", lager.Data{"feed": rssURL, "output": outputDir})
+
+	_, episodes, err := ParseRSSWithGofeed(rssURL)
 	if err != nil {
+		p.logger.Error("failed-parsing-feed", err)
 		return fmt.Errorf("failed to fetch RSS feed: %w", err)
 	}
-	fmt.Printf("[Pipeline] Found %d valid episodes in feed.\n", len(episodes))
 
-	maxConcurrentWorkers := runtime.NumCPU()
-	if val, ok := os.LookupEnv("PODPEDIA_MAX_WORKERS"); ok {
-		fmt.Printf("[Pipeline] Using custom concurrency limit: %s\n", val)
-		// In a real app, you'd parse this to int.
-	}
-	
-	pool := pond.New(maxConcurrentWorkers, 0, pond.IdleTimeout(10*time.Second))
+	p.logger.Info("found-episodes", lager.Data{"count": len(episodes)})
+
+	pool := pond.New(p.maxWorkers, 0, pond.IdleTimeout(10*time.Second))
 	defer pool.StopAndWait()
 
 	startTime := time.Now()
@@ -38,51 +75,54 @@ func Run(rssURL string, outputDir string) error {
 	for _, ep := range episodes {
 		episode := ep
 		pool.Submit(func() {
-			processEpisode(episode, outputDir)
+			p.processEpisode(episode, outputDir)
 		})
 	}
 
 	pool.StopAndWait()
-	fmt.Printf("\n[Pipeline] Completed in %v\n", time.Since(startTime))
+	p.logger.Info("completed", lager.Data{"duration": time.Since(startTime).String()})
 	return nil
 }
 
-func processEpisode(ep types.Episode, outputDir string) {
-	fmt.Printf("[Worker] Starting Episode: %s\n", ep.Title)
+func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
+	lsess := p.logger.Session("process-episode", lager.Data{"episode": ep.ID})
+	lsess.Info("starting")
 
 	// Download audio if needed
 	audioPath := fmt.Sprintf("%s/%s.mp3", outputDir, ep.ID)
 	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
-		fmt.Printf("[Worker] Downloading audio for: %s\n", ep.Title)
-		if err := DownloadAudio(ep.AudioURL, audioPath); err != nil {
-			fmt.Printf("[Worker] ERROR: Failed to download audio for %s: %v\n", ep.ID, err)
+		lsess.Info("downloading-audio")
+		if err := p.downloader.DownloadAudio(ep.AudioURL, audioPath); err != nil {
+			lsess.Error("failed-download", err)
 			return
 		}
 	}
 
 	if ep.Transcript == "" {
-		transcript, err := transcription.Transcribe(ep.AudioURL)
+		lsess.Info("transcribing")
+		transcript, err := p.transcriber.Transcribe(ep.AudioURL)
 		if err != nil {
-			fmt.Printf("[Worker] ERROR: Failed to transcribe episode %s: %v\n", ep.ID, err)
+			lsess.Error("failed-transcription", err)
 			return
 		}
 		ep.Transcript = transcript
 	}
 
-	entry, err := llm.ExtractEntities(ep)
+	lsess.Info("extracting-entities")
+	entry, err := p.extractor.ExtractEntities(ep)
 	if err != nil {
-		fmt.Printf("[Worker] ERROR: Failed extraction for episode %s: %v\n", ep.ID, err)
+		lsess.Error("failed-extraction", err)
 		return
 	}
 
-	if err := storage.SaveRawData(outputDir, ep); err != nil {
-		fmt.Printf("[Worker] ERROR: Failed to save raw data for %s: %v\n", ep.ID, err)
+	if err := p.store.SaveRawData(outputDir, ep); err != nil {
+		lsess.Error("failed-save-raw", err)
 	}
-	if err := storage.SaveStructuredData(outputDir, entry); err != nil {
-		fmt.Printf("[Worker] ERROR: Failed to save structured data for %s: %v\n", entry.EpisodeID, err)
+	if err := p.store.SaveStructuredData(outputDir, entry); err != nil {
+		lsess.Error("failed-save-structured", err)
 	}
 
-	fmt.Printf("[Worker] Completed Episode: %s\n", ep.Title)
+	lsess.Info("completed")
 }
 
 func validateEpisode(ep types.Episode) error {
@@ -95,7 +135,7 @@ func validateEpisode(ep types.Episode) error {
 	return nil
 }
 
-func parseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
+func ParseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 	fp := gofeed.NewParser()
 	feed, err := fp.ParseURL(url)
 	if err != nil {
@@ -156,6 +196,6 @@ func parseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 }
 
 func fetchRSSFeed(url string) ([]types.Episode, error) {
-	_, episodes, err := parseRSSWithGofeed(url)
+	_, episodes, err := ParseRSSWithGofeed(url)
 	return episodes, err
 }

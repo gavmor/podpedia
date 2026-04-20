@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"code.cloudfoundry.org/lager/v3"
+	"github.com/gavmor/podpedia/internal/llm"
 	"github.com/gavmor/podpedia/internal/pipeline"
+	"github.com/gavmor/podpedia/internal/storage"
+	"github.com/gavmor/podpedia/internal/transcription"
 	"github.com/spf13/cobra"
 )
 
@@ -23,8 +27,20 @@ var runCmd = &cobra.Command{
 			fmt.Println("Error: RSS feed URL is required. Use --url or -u")
 			return
 		}
-		if err := pipeline.Run(rssURL, outputDir); err != nil {
-			fmt.Printf("Pipeline error: %v\n", err)
+
+		logger := lager.NewLogger("podpedia")
+		logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.INFO))
+
+		p := pipeline.NewPipeline(
+			logger,
+			transcription.NewTranscriber(),
+			llm.NewExtractor(),
+			pipeline.NewDownloader(),
+			storage.NewStore(),
+		)
+
+		if err := p.Run(rssURL, outputDir); err != nil {
+			logger.Error("pipeline-failed", err)
 			os.Exit(1)
 		}
 	},

@@ -18,3 +18,10 @@
 ## Infrastructure & Concurrency
 - **Worker Pool:** [alitto/pond](https://github.com/alitto/pond) - High-performance goroutine worker pool with backpressure and dynamic scaling.
 - **Concurrency Model:** Hardware-aware concurrent processing using `pond` pools. Workers scale dynamically based on available CPU cores (`runtime.NumCPU()`).
+- **Logging:** [lager](https://github.com/cloudfoundry/lager) - Structured JSON logging for high-scale observability.
+
+## Testing & Quality
+- **BDD Framework:** [Ginkgo V2](https://github.com/onsi/ginkgo) - Behavior-Driven Development for expressive, documentation-like tests.
+- **Matcher Library:** [Gomega](https://github.com/onsi/gomega) - Expressive, asynchronous matchers for Go.
+- **Mocking:** [counterfeiter](https://github.com/maxbrunsfeld/counterfeiter) - Generates type-safe fakes for consumer-driven interfaces.
+- **Paradigm:** Strict black-box testing and consumer-defined interfaces.

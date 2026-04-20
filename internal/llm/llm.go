@@ -11,7 +11,13 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func ExtractEntities(ep types.Episode) (types.EncyclopediaEntry, error) {
+type Extractor struct{}
+
+func NewExtractor() *Extractor {
+	return &Extractor{}
+}
+
+func (e *Extractor) ExtractEntities(ep types.Episode) (types.EncyclopediaEntry, error) {
 	// Simulate LLM inference time
 	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1500)+1000))
 
