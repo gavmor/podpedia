@@ -118,6 +118,16 @@ func parseRSS(content []byte) (types.Podcast, []types.Episode, error) {
 	return podcast, rss.Channel.Items, nil
 }
 
+func validateEpisode(ep types.Episode) error {
+	if ep.Title == "" {
+		return fmt.Errorf("missing episode title")
+	}
+	if ep.AudioURL == "" {
+		return fmt.Errorf("missing audio URL for episode: %s", ep.Title)
+	}
+	return nil
+}
+
 func fetchRSSFeed(url string) []types.Episode {
 	fmt.Printf("[Pipeline] Fetching RSS feed from: %s\n", url)
 	return []types.Episode{

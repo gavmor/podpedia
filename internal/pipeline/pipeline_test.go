@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gavmor/podpedia/internal/types"
 )
 
 func TestFetchFeedContent(t *testing.T) {
@@ -63,5 +65,44 @@ func TestParseRSS(t *testing.T) {
 
 	if episodes[0].Title != "Episode 1" {
 		t.Errorf("Expected episode title 'Episode 1', got '%s'", episodes[0].Title)
+	}
+}
+
+func TestValidateEpisode(t *testing.T) {
+	tests := []struct {
+		name    string
+		ep      types.Episode
+		wantErr bool
+	}{
+		{
+			name: "valid episode",
+			ep: types.Episode{
+				Title:    "Valid Title",
+				AudioURL: "http://example.com/audio.mp3",
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing title",
+			ep: types.Episode{
+				AudioURL: "http://example.com/audio.mp3",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing audio url",
+			ep: types.Episode{
+				Title: "Valid Title",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateEpisode(tt.ep); (err != nil) != tt.wantErr {
+				t.Errorf("validateEpisode() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
