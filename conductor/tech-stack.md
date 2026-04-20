@@ -13,4 +13,4 @@
 - **Interface:** OpenAI-compatible API - Portability and support for various backends.
 
 ## Infrastructure & Concurrency
-- **Concurrency Model:** Go native goroutines and channels for high-throughput pipeline processing.
+- **Concurrency Model:** Hardware-aware concurrent processing using Go native goroutines and channels. Workers scale dynamically based on available CPU cores (`runtime.NumCPU()`).
