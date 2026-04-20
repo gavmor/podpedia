@@ -1,8 +1,10 @@
 package pipeline
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -67,5 +69,33 @@ func TestGetAudioMetadata(t *testing.T) {
 				t.Errorf("GetAudioMetadata() supportsRange = %v, want %v", supportsRange, tt.wantRange)
 			}
 		})
+	}
+}
+
+func TestDownloadAudio(t *testing.T) {
+	content := "This is a fake audio file content."
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
+		w.Header().Set("Accept-Ranges", "bytes")
+		fmt.Fprint(w, content)
+	}))
+	defer ts.Close()
+
+	dest := "test_audio.mp3"
+	defer os.Remove(dest)
+
+	err := DownloadAudio(ts.URL, dest)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Verify file content
+	data, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatalf("Failed to read downloaded file: %v", err)
+	}
+
+	if string(data) != content {
+		t.Errorf("Expected content '%s', got '%s'", content, string(data))
 	}
 }

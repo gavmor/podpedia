@@ -4,7 +4,15 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/melbahja/got"
 )
+
+// DownloadAudio downloads an audio file concurrently using the got library.
+func DownloadAudio(url string, dest string) error {
+	g := got.New()
+	return g.Download(url, dest)
+}
 
 // GetAudioMetadata fetches the file size and checks for Range request support using an HTTP HEAD request.
 func GetAudioMetadata(url string) (int64, bool, error) {
