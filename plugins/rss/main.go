@@ -8,10 +8,10 @@ package main
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"strings"
 
 	"github.com/gavmor/wasm-microkernel/abi"
+	"github.com/mmcdole/gofeed"
 )
 
 func main() {}
@@ -37,28 +37,6 @@ func Execute(offset, length uint32) uint64 {
 	})
 }
 
-// ── RSS structs ───────────────────────────────────────────────────────────────
-
-type xmlDoc struct {
-	Channel xmlChannel `xml:"channel"`
-}
-type xmlChannel struct {
-	Title       string    `xml:"title"`
-	Description string    `xml:"description"`
-	Items       []xmlItem `xml:"item"`
-}
-type xmlItem struct {
-	GUID        string       `xml:"guid"`
-	Title       string       `xml:"title"`
-	Description string       `xml:"description"`
-	PubDate     string       `xml:"pubDate"`
-	Enclosure   xmlEnclosure `xml:"enclosure"`
-	Duration    string       `xml:"duration"`
-}
-type xmlEnclosure struct {
-	URL string `xml:"url,attr"`
-}
-
 type outPodcast struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -73,24 +51,38 @@ type outEpisode struct {
 }
 
 func parseRSS(raw string) (outPodcast, []outEpisode, error) {
-	var doc xmlDoc
-	if err := xml.NewDecoder(strings.NewReader(raw)).Decode(&doc); err != nil {
+	fp := gofeed.NewParser()
+	feed, err := fp.ParseString(raw)
+	if err != nil {
 		return outPodcast{}, nil, err
 	}
-	ch := doc.Channel
-	p := outPodcast{Title: ch.Title, Description: ch.Description}
+	p := outPodcast{Title: feed.Title, Description: feed.Description}
 	var eps []outEpisode
-	for _, item := range ch.Items {
-		if item.Title == "" || item.Enclosure.URL == "" {
+	for _, item := range feed.Items {
+		if item.Title == "" || len(item.Enclosures) == 0 {
 			continue
 		}
 		id := item.GUID
 		if id == "" {
-			id = item.Enclosure.URL
+			id = item.Enclosures[0].URL
+		}
+		pubDate := ""
+		if item.PublishedParsed != nil {
+			pubDate = item.PublishedParsed.Format("Mon, 02 Jan 2006 15:04:05 +0000")
+		} else if item.Published != "" {
+			pubDate = item.Published
+		}
+		duration := ""
+		if item.ITunesExt != nil {
+			duration = item.ITunesExt.Duration
 		}
 		eps = append(eps, outEpisode{
-			ID: id, Title: item.Title, Description: item.Description,
-			PubDate: item.PubDate, AudioURL: item.Enclosure.URL, Duration: item.Duration,
+			ID:          id,
+			Title:       item.Title,
+			Description: strings.TrimSpace(item.Description),
+			PubDate:     pubDate,
+			AudioURL:    item.Enclosures[0].URL,
+			Duration:    duration,
 		})
 	}
 	return p, eps, nil
