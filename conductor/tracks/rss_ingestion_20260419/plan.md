@@ -5,8 +5,8 @@
 - [x] Task: Implement RSS feed fetcher in `internal/pipeline` 3c34cf1
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Ingestion Scaffolding' (Protocol in workflow.md)
 
-## Phase 2: XML Parsing & Validation
+## Phase 2: XML Parsing & Validation [checkpoint: 843fd65]
 - [x] Task: Implement XML parsing logic for RSS feeds 27f74b5
 - [x] Task: Add validation for required episode fields (Title, Media URL) d43c9cd
 - [x] Task: Integrate parser with fetcher in the pipeline e981311
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: XML Parsing & Validation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: XML Parsing & Validation' (Protocol in workflow.md)
