@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -92,6 +93,29 @@ func fetchFeedContent(url string) ([]byte, error) {
 	}
 
 	return io.ReadAll(resp.Body)
+}
+
+func parseRSS(content []byte) (types.Podcast, []types.Episode, error) {
+	type RSS struct {
+		XMLName xml.Name `xml:"rss"`
+		Channel struct {
+			Title       string          `xml:"title"`
+			Description string          `xml:"description"`
+			Items       []types.Episode `xml:"item"`
+		} `xml:"channel"`
+	}
+
+	var rss RSS
+	if err := xml.Unmarshal(content, &rss); err != nil {
+		return types.Podcast{}, nil, fmt.Errorf("failed to parse XML: %w", err)
+	}
+
+	podcast := types.Podcast{
+		Title:       rss.Channel.Title,
+		Description: rss.Channel.Description,
+	}
+
+	return podcast, rss.Channel.Items, nil
 }
 
 func fetchRSSFeed(url string) []types.Episode {

@@ -30,3 +30,38 @@ func TestFetchFeedContent(t *testing.T) {
 		t.Error("Expected error for invalid URL, got nil")
 	}
 }
+
+func TestParseRSS(t *testing.T) {
+	xmlInput := `
+		<rss version="2.0">
+			<channel>
+				<title>Test Podcast</title>
+				<description>A podcast about testing</description>
+				<item>
+					<title>Episode 1</title>
+					<description>The first episode</description>
+					<pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
+					<enclosure url="http://example.com/e1.mp3" type="audio/mpeg"/>
+					<guid>e1-guid</guid>
+				</item>
+			</channel>
+		</rss>
+	`
+
+	podcast, episodes, err := parseRSS([]byte(xmlInput))
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if podcast.Title != "Test Podcast" {
+		t.Errorf("Expected podcast title 'Test Podcast', got '%s'", podcast.Title)
+	}
+
+	if len(episodes) != 1 {
+		t.Fatalf("Expected 1 episode, got %d", len(episodes))
+	}
+
+	if episodes[0].Title != "Episode 1" {
+		t.Errorf("Expected episode title 'Episode 1', got '%s'", episodes[0].Title)
+	}
+}
