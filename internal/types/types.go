@@ -4,19 +4,25 @@ import "encoding/xml"
 
 // Podcast represents the high-level metadata of a podcast feed
 type Podcast struct {
-	Title       string `xml:"title"`
-	Description string `xml:"description"`
-	URL         string
+	Title       string   `xml:"title"`
+	Description string   `xml:"description"`
+	URL         string   `xml:"-"`
+	Author      string   `xml:"-"` // From iTunes/DublinCore
+	Categories  []string `xml:"-"` // From iTunes
 }
 
 // Episode represents an individual podcast episode from the RSS feed
 type Episode struct {
-	ID          string `xml:"guid"`
-	Title       string `xml:"title"`
-	AudioURL    string `xml:"-"`
-	PubDate     string `xml:"pubDate"`
-	Description string `xml:"description"`
-	Transcript  string `xml:"-"` // Not in RSS
+	ID          string   `xml:"guid"`
+	Title       string   `xml:"title"`
+	AudioURL    string   `xml:"-"`
+	PubDate     string   `xml:"pubDate"`
+	Description string   `xml:"description"`
+	Author      string   `xml:"-"`   // From iTunes/DublinCore
+	Duration    string   `xml:"-"`   // From iTunes
+	Explicit    bool     `xml:"-"`   // From iTunes
+	Categories  []string `xml:"-"`   // From iTunes
+	Transcript  string   `xml:"-"`   // Not in RSS
 }
 
 func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {

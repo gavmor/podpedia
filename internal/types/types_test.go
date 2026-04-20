@@ -54,5 +54,9 @@ func TestMetadataStructures(t *testing.T) {
 	if ep.AudioURL != "http://example.com/e1.mp3" {
 		t.Errorf("Expected audio URL 'http://example.com/e1.mp3', got '%s'", ep.AudioURL)
 	}
-	// We'll need to update the struct to support these fields
+
+	// Verify new fields are present (though not unmarshaled by legacy XML)
+	if ep.Author != "" {
+		t.Errorf("Expected empty author for legacy parse, got '%s'", ep.Author)
+	}
 }
