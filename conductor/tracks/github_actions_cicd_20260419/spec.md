@@ -7,7 +7,7 @@ Implement a comprehensive GitHub Actions CI/CD pipeline to automate testing, lin
 - **Automated Testing:** Execute all unit and integration tests on every push and pull request.
 - **Static Analysis (Linting):** Integrate `golangci-lint` to enforce code style and catch common errors.
 - **Security Scanning:** Use `govulncheck` to identify known vulnerabilities in project dependencies.
-- **Binary Release:** Automate the creation of GitHub Releases containing the compiled binary for Linux (amd64).
+- **Binary Release:** Automate the creation of GitHub Releases containing compiled binaries for Linux and macOS (amd64 and arm64).
 - **Release Trigger:** A new release should be created (or updated) on every push to the `main` branch.
 
 ## Technical Approach
