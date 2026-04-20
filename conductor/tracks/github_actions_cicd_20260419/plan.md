@@ -18,3 +18,6 @@
     - [x] Write: Define the workflow to run GoReleaser on pushes to \`main\`. fe479c6
     - [x] Verify: Ensure the workflow triggers correctly and handles authentication (GITHUB_TOKEN). fe479c6
 - [x] Task: Conductor - User Manual Verification 'Phase 2: GoReleaser & CD Pipeline' (Protocol in workflow.md)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions 5b19a7e
