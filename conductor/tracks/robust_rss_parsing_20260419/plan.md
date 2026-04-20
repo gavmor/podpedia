@@ -1,7 +1,7 @@
 # Implementation Plan: Implement Robust RSS Parsing with gofeed
 
 ## Phase 1: Dependency & Schema Updates
-- [ ] Task: Add `github.com/mmcdole/gofeed` to `go.mod`
+- [x] Task: Add \`github.com/mmcdole/gofeed\` to \`go.mod\` 484f192
 - [ ] Task: Extend `internal/types` with new metadata fields
     - [ ] Update `Podcast` struct to include Author and Categories
     - [ ] Update `Episode` struct to include Author, Duration, and Explicit flag
