@@ -11,65 +11,65 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gavmor/wasm-microkernel/abi"
-	"github.com/gavmor/wasm-microkernel/guest"
+	"github.com/gavmor/wasm-microkernel/guest-bindings/plugin_world"
+	host "github.com/gavmor/wasm-microkernel/guest-bindings/podpedia/kernel/host_capabilities"
+	"github.com/samber/lo"
 )
 
 func main() {}
 
-//go:wasmexport allocate
-func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
+func init() { plugin_world.SetExportsPluginWorld(&ExtractorPlugin{}) }
 
-//go:wasmexport Execute
-func Execute(offset, length uint32) uint64 {
-	return abi.Delegate(offset, length, func(input []byte) []byte {
-		var req struct {
-			Episode struct {
-				ID          string `json:"id"`
-				Title       string `json:"title"`
-				Description string `json:"description"`
-				Transcript  string `json:"transcript"`
-			} `json:"episode"`
-			OllamaURL string `json:"ollama_url"`
-		}
-		if err := json.Unmarshal(input, &req); err != nil {
-			return errBytes("bad request: " + err.Error())
-		}
+type ExtractorPlugin struct{}
 
-		ep := req.Episode
-		guest.Log("extracting: " + ep.Title)
+func (e *ExtractorPlugin) Execute(reqJSON string) (plugin_world.Result[string, string], error) {
+	var req struct {
+		Episode struct {
+			ID          string `json:"id"`
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Transcript  string `json:"transcript"`
+		} `json:"episode"`
+		OllamaURL string `json:"ollama_url"`
+	}
+	if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
+		return plugin_world.Err[string, string]("bad request: " + err.Error()), nil
+	}
 
-		reqBody, _ := json.Marshal(map[string]any{
-			"model":  "qwen3.5:27b",
-			"prompt": buildPrompt(ep.Title, ep.Description, ep.Transcript),
-			"stream": false,
-		})
-		raw := guest.HTTPPost(req.OllamaURL+"/api/generate", string(reqBody))
+	ep := req.Episode
+	host.LogMsg("extracting: " + ep.Title)
 
-		var ollamaResp struct {
-			Response string `json:"response"`
-		}
-		completion := ""
-		if err := json.Unmarshal(raw, &ollamaResp); err == nil {
-			completion = ollamaResp.Response
-		}
-
-		entry, err := parseCompletion(ep.ID, completion)
-		if err != nil {
-			guest.Log("parse failed, returning empty entry: " + err.Error())
-			entry = map[string]any{"episode_id": ep.ID, "guests": []any{}, "companies": []any{}}
-		}
-
-		out, _ := json.Marshal(map[string]any{"entry": entry})
-		return out
+	content, _ := lo.Coalesce(ep.Transcript, ep.Description)
+	reqBody, _ := json.Marshal(map[string]any{
+		"model":  "qwen3.5:27b",
+		"prompt": buildPrompt(ep.Title, content),
+		"stream": false,
 	})
+
+	rawRes, err := host.HttpPost(req.OllamaURL+"/api/generate", string(reqBody))
+	if err != nil {
+		return plugin_world.Err[string, string]("host http-post failed: " + err.Error()), nil
+	}
+
+	var ollamaResp struct {
+		Response string `json:"response"`
+	}
+	completion := ""
+	if err := json.Unmarshal([]byte(rawRes), &ollamaResp); err == nil {
+		completion = ollamaResp.Response
+	}
+
+	entry, err := parseCompletion(ep.ID, completion)
+	if err != nil {
+		host.LogMsg("parse failed, returning empty entry: " + err.Error())
+		entry = map[string]any{"episode_id": ep.ID, "guests": []any{}, "companies": []any{}}
+	}
+
+	out, _ := json.Marshal(map[string]any{"entry": entry})
+	return plugin_world.Ok[string, string](string(out)), nil
 }
 
-func buildPrompt(title, description, transcript string) string {
-	content := description
-	if transcript != "" {
-		content = transcript
-	}
+func buildPrompt(title, content string) string {
 	return fmt.Sprintf(`Extract structured data from this podcast episode. Return ONLY valid JSON:
 {"guests":[{"name":"","background":"","ideology":""}],"companies":[{"name":"","business_model":"","customers":""}]}
 
@@ -104,8 +104,4 @@ func parseCompletion(episodeID, raw string) (map[string]any, error) {
 		"guests":     extracted.Guests,
 		"companies":  extracted.Companies,
 	}, nil
-}
-
-func errBytes(msg string) []byte {
-	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
 }
