@@ -195,7 +195,3 @@ func ParseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 	return podcast, episodes, nil
 }
 
-func fetchRSSFeed(url string) ([]types.Episode, error) {
-	_, episodes, err := ParseRSSWithGofeed(url)
-	return episodes, err
-}

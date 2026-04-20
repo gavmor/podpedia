@@ -6,10 +6,6 @@ import (
 	"time"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 type Transcriber struct{}
 
 func NewTranscriber() *Transcriber {

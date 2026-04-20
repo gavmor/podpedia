@@ -49,6 +49,8 @@ var runCmd = &cobra.Command{
 func init() {
 	runCmd.Flags().StringVarP(&rssURL, "url", "u", "", "URL of the podcast RSS feed")
 	runCmd.Flags().StringVarP(&outputDir, "output", "o", "output", "Directory to save processed data")
-	runCmd.MarkFlagRequired("url")
+	if err := runCmd.MarkFlagRequired("url"); err != nil {
+		panic(err)
+	}
 	rootCmd.AddCommand(runCmd)
 }

@@ -7,10 +7,6 @@ import (
 	"github.com/gavmor/podpedia/internal/types"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 type Extractor struct{}
 
 func NewExtractor() *Extractor {
