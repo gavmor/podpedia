@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	rssURL    string
-	outputDir string
-	pluginDir string
-	ollamaURL string
+	rssURL        string
+	outputDir     string
+	pluginDir     string
+	ollamaURL     string
+	transcribeURL string
 )
 
 var runCmd = &cobra.Command{
@@ -37,7 +38,7 @@ Each stage is a sandboxed WASM plugin loaded from --plugins.`,
 
 		ctx := context.Background()
 
-		k, err := kernel.New(ctx, logger, ollamaURL)
+		k, err := kernel.New(ctx, logger, ollamaURL, transcribeURL)
 		if err != nil {
 			logger.Error("kernel-init", err)
 			os.Exit(1)
@@ -73,6 +74,7 @@ func init() {
 	runCmd.Flags().StringVarP(&outputDir, "output", "o", "output", "Directory to save processed data")
 	runCmd.Flags().StringVarP(&pluginDir, "plugins", "p", "dist/plugins", "Directory containing compiled .wasm plugins")
 	runCmd.Flags().StringVar(&ollamaURL, "ollama", "http://localhost:11434", "Ollama base URL for LLM inference")
+	runCmd.Flags().StringVar(&transcribeURL, "transcribe-url", "", "ASR endpoint URL for transcription (Whisper.cpp, Deepgram, etc.)")
 	if err := runCmd.MarkFlagRequired("url"); err != nil {
 		panic(err)
 	}

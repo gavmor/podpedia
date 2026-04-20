@@ -32,9 +32,13 @@ type DownloadResponse struct {
 
 // ── Transcriber plugin ────────────────────────────────────────────────────────
 
+// TranscribeRequest tells the transcriber plugin where the audio lives and
+// which HTTP endpoint to POST to for transcription. The plugin owns the
+// API-specific request format; the host only provides http_post.
 type TranscribeRequest struct {
-	AudioPath string `json:"audio_path"`
-	AudioURL  string `json:"audio_url"`
+	AudioPath     string `json:"audio_path"`
+	AudioURL      string `json:"audio_url"`
+	TranscribeURL string `json:"transcribe_url"` // e.g. Deepgram, AssemblyAI, Whisper.cpp
 }
 
 type TranscribeResponse struct {
@@ -43,8 +47,11 @@ type TranscribeResponse struct {
 
 // ── Extractor plugin ──────────────────────────────────────────────────────────
 
+// ExtractRequest carries the episode and the Ollama base URL. The plugin
+// builds and sends the LLM request itself; the host only provides http_post.
 type ExtractRequest struct {
-	Episode types.Episode `json:"episode"`
+	Episode   types.Episode `json:"episode"`
+	OllamaURL string        `json:"ollama_url"`
 }
 
 type ExtractResponse struct {

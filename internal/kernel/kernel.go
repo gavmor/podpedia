@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"code.cloudfoundry.org/lager/v3"
 	"github.com/gavmor/wasm-microkernel/abi"
@@ -23,11 +24,12 @@ const HostModule = "podpedia_host"
 
 // Kernel holds the wazero runtime and all loaded plugins.
 type Kernel struct {
-	ctx       context.Context
-	runtime   wazero.Runtime
-	logger    lager.Logger
-	ollamaURL string
-	plugins   map[string]*Plugin
+	ctx           context.Context
+	runtime       wazero.Runtime
+	logger        lager.Logger
+	ollamaURL     string // threaded through ExtractRequest; plugins own the Ollama API logic
+	transcribeURL string // threaded through TranscribeRequest; plugins own the ASR API logic
+	plugins       map[string]*Plugin
 }
 
 // Plugin wraps an instantiated WASM module.
@@ -37,16 +39,19 @@ type Plugin struct {
 }
 
 // New creates a Kernel, instantiates WASI, and registers all host capabilities.
-func New(ctx context.Context, logger lager.Logger, ollamaURL string) (*Kernel, error) {
+// ollamaURL and transcribeURL are threaded through plugin requests so plugins
+// can own the API call logic; the host only provides generic http_post.
+func New(ctx context.Context, logger lager.Logger, ollamaURL, transcribeURL string) (*Kernel, error) {
 	r := wazero.NewRuntime(ctx)
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	k := &Kernel{
-		ctx:       ctx,
-		runtime:   r,
-		logger:    logger,
-		ollamaURL: ollamaURL,
-		plugins:   make(map[string]*Plugin),
+		ctx:           ctx,
+		runtime:       r,
+		logger:        logger,
+		ollamaURL:     ollamaURL,
+		transcribeURL: transcribeURL,
+		plugins:       make(map[string]*Plugin),
 	}
 
 	if err := k.registerCapabilities(); err != nil {
@@ -170,34 +175,39 @@ func (k *Kernel) registerCapabilities() error {
 		}),
 	)
 
-	// transcribe(fat_ptr json-encoded-path) -> fat_ptr json-encoded-transcript
-	// Stub — replace body with Whisper or Deepgram call.
-	b.ExportFunction("transcribe", one64, one64,
-		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			stack[0] = hostWriteToGuest(ctx, mod, []byte(`""`))
-		}),
-	)
-
-	// llm_infer(fat_ptr json-encoded-prompt) -> fat_ptr json-encoded-completion
-	b.ExportFunction("llm_infer", one64, one64,
+	// http_post(fat_ptr "{url,body,content_type?}") -> fat_ptr response-bytes
+	// Generic HTTP POST. Plugins use this to call Ollama, Deepgram, or any
+	// other API — the host doesn't need to know what the API does.
+	b.ExportFunction("http_post", one64, one64,
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 			off, ln := abi.DecodeFatPointer(stack[0])
-			promptJSON, _ := abi.ReadGuestBuffer(ctx, mod, off, ln)
-			var prompt string
-			if err := json.Unmarshal(promptJSON, &prompt); err != nil {
-				k.logger.Error("llm-infer-unmarshal", err)
-				stack[0] = hostWriteToGuest(ctx, mod, []byte(`""`))
+			raw, _ := abi.ReadGuestBuffer(ctx, mod, off, ln)
+			var req struct {
+				URL         string `json:"url"`
+				Body        string `json:"body"`
+				ContentType string `json:"content_type"`
+			}
+			if err := json.Unmarshal(raw, &req); err != nil {
+				stack[0] = hostWriteToGuest(ctx, mod, errJSON(err))
 				return
 			}
-
-			result, err := k.ollamaInfer(prompt)
+			ct := req.ContentType
+			if ct == "" {
+				ct = "application/json"
+			}
+			resp, err := http.Post(req.URL, ct, strings.NewReader(req.Body)) //nolint:gosec
 			if err != nil {
-				k.logger.Error("llm-infer", err)
-				stack[0] = hostWriteToGuest(ctx, mod, []byte(`""`))
+				k.logger.Error("http-post", err)
+				stack[0] = hostWriteToGuest(ctx, mod, errJSON(err))
 				return
 			}
-			out, _ := json.Marshal(result)
-			stack[0] = hostWriteToGuest(ctx, mod, out)
+			defer func() { _ = resp.Body.Close() }()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				stack[0] = hostWriteToGuest(ctx, mod, errJSON(err))
+				return
+			}
+			stack[0] = hostWriteToGuest(ctx, mod, body)
 		}),
 	)
 
@@ -290,35 +300,3 @@ func downloadFile(url, dest string) error {
 	return err
 }
 
-func (k *Kernel) ollamaInfer(prompt string) (string, error) {
-	body, _ := json.Marshal(map[string]any{
-		"model":  "qwen3.5:27b",
-		"prompt": prompt,
-		"stream": false,
-	})
-	resp, err := http.Post(k.ollamaURL+"/api/generate", "application/json", //nolint:gosec
-		newBytesReader(body))
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	var result struct {
-		Response string `json:"response"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
-	}
-	return result.Response, nil
-}
-
-type bytesReader struct{ b []byte; pos int }
-
-func newBytesReader(b []byte) *bytesReader { return &bytesReader{b: b} }
-func (r *bytesReader) Read(p []byte) (int, error) {
-	if r.pos >= len(r.b) {
-		return 0, io.EOF
-	}
-	n := copy(p, r.b[r.pos:])
-	r.pos += n
-	return n, nil
-}

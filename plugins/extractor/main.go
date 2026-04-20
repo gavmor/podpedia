@@ -2,7 +2,7 @@
 
 // Plugin: extractor
 // Receives an Episode and extracts structured entities (guests, companies)
-// by calling the host's llm_infer capability with a structured prompt.
+// by POSTing to Ollama via the host's generic http_post capability.
 // Swap this plugin to change models, prompt strategies, or output schemas.
 package main
 
@@ -17,8 +17,8 @@ import (
 
 func main() {}
 
-//go:wasmimport podpedia_host llm_infer
-func hostLLMInfer(fatPtr uint64) uint64
+//go:wasmimport podpedia_host http_post
+func hostHTTPPost(fatPtr uint64) uint64
 
 //go:wasmimport podpedia_host log
 func hostLog(fatPtr uint64)
@@ -36,6 +36,7 @@ func Execute(offset, length uint32) uint64 {
 				Description string `json:"description"`
 				Transcript  string `json:"transcript"`
 			} `json:"episode"`
+			OllamaURL string `json:"ollama_url"`
 		}
 		if err := json.Unmarshal(input, &req); err != nil {
 			return errBytes("bad request: " + err.Error())
@@ -44,7 +45,7 @@ func Execute(offset, length uint32) uint64 {
 		ep := req.Episode
 		logMsg("extracting: " + ep.Title)
 		prompt := buildPrompt(ep.Title, ep.Description, ep.Transcript)
-		completion := callLLM(prompt)
+		completion := callOllama(req.OllamaURL, prompt)
 
 		entry, err := parseCompletion(ep.ID, completion)
 		if err != nil {
@@ -74,16 +75,26 @@ Content: %s
 JSON:`, title, content)
 }
 
-func callLLM(prompt string) string {
-	promptJSON, _ := json.Marshal(prompt)
-	result := hostLLMInfer(abi.ReturnBytes(promptJSON))
+func callOllama(ollamaURL, prompt string) string {
+	reqBody, _ := json.Marshal(map[string]any{
+		"model":  "qwen3.5:27b",
+		"prompt": prompt,
+		"stream": false,
+	})
+	postReq, _ := json.Marshal(map[string]string{
+		"url":  ollamaURL + "/api/generate",
+		"body": string(reqBody),
+	})
+	result := hostHTTPPost(abi.ReturnBytes(postReq))
 	off, ln := abi.DecodeFatPointer(result)
 	raw := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(off))), ln)
-	var s string
-	if err := json.Unmarshal(raw, &s); err != nil {
+	var resp struct {
+		Response string `json:"response"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil {
 		return string(raw)
 	}
-	return s
+	return resp.Response
 }
 
 func parseCompletion(episodeID, raw string) (map[string]any, error) {
@@ -115,8 +126,6 @@ func parseCompletion(episodeID, raw string) (map[string]any, error) {
 }
 
 func logMsg(s string) { hostLog(abi.ReturnBytes([]byte(s))) }
-
 func errBytes(msg string) []byte {
-	b, _ := json.Marshal(map[string]string{"error": msg})
-	return b
+	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
 }

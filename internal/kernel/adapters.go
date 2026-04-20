@@ -18,7 +18,7 @@ type WasmTranscriber struct{ k *Kernel }
 func NewTranscriber(k *Kernel) *WasmTranscriber { return &WasmTranscriber{k} }
 
 func (t *WasmTranscriber) Transcribe(audioURL string) (string, error) {
-	raw, err := t.k.Call("transcriber", protocol.TranscribeRequest{AudioURL: audioURL})
+	raw, err := t.k.Call("transcriber", protocol.TranscribeRequest{AudioURL: audioURL, TranscribeURL: t.k.transcribeURL})
 	if err != nil {
 		return "", err
 	}
@@ -36,7 +36,7 @@ type WasmExtractor struct{ k *Kernel }
 func NewExtractor(k *Kernel) *WasmExtractor { return &WasmExtractor{k} }
 
 func (e *WasmExtractor) ExtractEntities(ep types.Episode) (types.EncyclopediaEntry, error) {
-	raw, err := e.k.Call("extractor", protocol.ExtractRequest{Episode: ep})
+	raw, err := e.k.Call("extractor", protocol.ExtractRequest{Episode: ep, OllamaURL: e.k.ollamaURL})
 	if err != nil {
 		return types.EncyclopediaEntry{}, err
 	}
