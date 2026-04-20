@@ -12,5 +12,5 @@
     - [x] Write Tests: Create failing tests for extended metadata extraction and robust parsing of problematic feeds 474c08d
     - [x] Implement: Replace manual XML logic with \`gofeed.Parser\` and verify against tests 474c08d
 - [x] Task: Map iTunes and Dublin Core extensions to internal types 5559643
-- [ ] Task: Clean up and remove legacy `parseRSS` and `fetchFeedContent` functions from `pipeline.go`
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Gofeed Integration' (Protocol in workflow.md)
+- [x] Task: Clean up and remove legacy \`parseRSS\` and \`fetchFeedContent\` functions from \`pipeline.go\` 474c08d
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Gofeed Integration' (Protocol in workflow.md) [checkpoint: ea82dac]
