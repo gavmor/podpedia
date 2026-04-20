@@ -3,7 +3,7 @@ module github.com/gavmor/podpedia/plugins/store
 go 1.26.1
 
 require (
-	github.com/gavmor/wasm-microkernel v0.4.1
+	github.com/gavmor/wasm-microkernel v0.5.0
 	github.com/samber/lo v1.53.0
 )
 

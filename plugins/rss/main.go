@@ -10,31 +10,29 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/gavmor/wasm-microkernel/abi"
+	"github.com/gavmor/wasm-microkernel/guest-bindings/plugin_world"
 	"github.com/mmcdole/gofeed"
 )
 
 func main() {}
 
-//go:wasmexport allocate
-func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
+func init() { plugin_world.SetExportsPluginWorld(&RSSPlugin{}) }
 
-//go:wasmexport Execute
-func Execute(offset, length uint32) uint64 {
-	return abi.Delegate(offset, length, func(input []byte) []byte {
-		var req struct {
-			XML string `json:"xml"`
-		}
-		if err := json.Unmarshal(input, &req); err != nil {
-			return errBytes("bad request: " + err.Error())
-		}
-		p, eps, err := parseRSS(req.XML)
-		if err != nil {
-			return errBytes("rss parse: " + err.Error())
-		}
-		out, _ := json.Marshal(map[string]any{"podcast": p, "episodes": eps})
-		return out
-	})
+type RSSPlugin struct{}
+
+func (r *RSSPlugin) Execute(reqJSON string) (plugin_world.Result[string, string], error) {
+	var req struct {
+		XML string `json:"xml"`
+	}
+	if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
+		return plugin_world.Err[string, string]("bad request: " + err.Error()), nil
+	}
+	p, eps, err := parseRSS(req.XML)
+	if err != nil {
+		return plugin_world.Err[string, string]("rss parse: " + err.Error()), nil
+	}
+	out, _ := json.Marshal(map[string]any{"podcast": p, "episodes": eps})
+	return plugin_world.Ok[string, string](string(out)), nil
 }
 
 type outPodcast struct {
@@ -86,9 +84,4 @@ func parseRSS(raw string) (outPodcast, []outEpisode, error) {
 		})
 	}
 	return p, eps, nil
-}
-
-func errBytes(msg string) []byte {
-	b, _ := json.Marshal(map[string]string{"error": msg})
-	return b
 }

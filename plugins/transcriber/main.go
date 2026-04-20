@@ -10,53 +10,50 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gavmor/wasm-microkernel/abi"
-	"github.com/gavmor/wasm-microkernel/guest"
+	"github.com/gavmor/wasm-microkernel/guest-bindings/plugin_world"
+	host "github.com/gavmor/wasm-microkernel/guest-bindings/podpedia/kernel/host_capabilities"
 	"github.com/samber/lo"
 )
 
 func main() {}
 
-//go:wasmexport allocate
-func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
+func init() { plugin_world.SetExportsPluginWorld(&TranscriberPlugin{}) }
 
-//go:wasmexport Execute
-func Execute(offset, length uint32) uint64 {
-	return abi.Delegate(offset, length, func(input []byte) []byte {
-		var req struct {
-			AudioPath     string `json:"audio_path"`
-			AudioURL      string `json:"audio_url"`
-			TranscribeURL string `json:"transcribe_url"`
-		}
-		if err := json.Unmarshal(input, &req); err != nil {
-			return errBytes("bad request: " + err.Error())
-		}
+type TranscriberPlugin struct{}
 
-		target, ok := lo.Coalesce(req.AudioPath, req.AudioURL)
-		if !ok {
-			return errBytes("audio_path or audio_url required")
-		}
+func (t *TranscriberPlugin) Execute(reqJSON string) (plugin_world.Result[string, string], error) {
+	var req struct {
+		AudioPath     string `json:"audio_path"`
+		AudioURL      string `json:"audio_url"`
+		TranscribeURL string `json:"transcribe_url"`
+	}
+	if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
+		return plugin_world.Err[string, string]("bad request: " + err.Error()), nil
+	}
 
-		if req.TranscribeURL == "" {
-			guest.Log("no transcribe_url configured, skipping: " + target)
-			return []byte(`{"transcript":""}`)
-		}
+	target, ok := lo.Coalesce(req.AudioPath, req.AudioURL)
+	if !ok {
+		return plugin_world.Err[string, string]("audio_path or audio_url required"), nil
+	}
 
-		guest.Log("transcribing " + target)
+	if req.TranscribeURL == "" {
+		host.LogMsg("no transcribe_url configured, skipping: " + target)
+		return plugin_world.Ok[string, string](`{"transcript":""}`), nil
+	}
 
-		reqBody, _ := json.Marshal(map[string]string{"audio_url": target})
-		raw := guest.HTTPPost(req.TranscribeURL, string(reqBody))
+	host.LogMsg("transcribing " + target)
 
-		var resp struct {
-			Transcript string `json:"transcript"`
-		}
-		if err := json.Unmarshal(raw, &resp); err != nil {
-			return []byte(fmt.Sprintf(`{"transcript":%q}`, string(raw)))
-		}
-		return []byte(fmt.Sprintf(`{"transcript":%q}`, resp.Transcript))
-	})
-}
+	reqBody, _ := json.Marshal(map[string]string{"audio_url": target})
+	rawRes, err := host.HttpPost(req.TranscribeURL, string(reqBody))
+	if err != nil {
+		return plugin_world.Err[string, string]("host http-post failed: " + err.Error()), nil
+	}
 
-func errBytes(msg string) []byte {
-	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
+	var resp struct {
+		Transcript string `json:"transcript"`
+	}
+	if err := json.Unmarshal([]byte(rawRes), &resp); err != nil {
+		return plugin_world.Ok[string, string](fmt.Sprintf(`{"transcript":%q}`, rawRes)), nil
+	}
+	return plugin_world.Ok[string, string](fmt.Sprintf(`{"transcript":%q}`, resp.Transcript)), nil
 }

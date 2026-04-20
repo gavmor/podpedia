@@ -11,35 +11,33 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gavmor/wasm-microkernel/abi"
-	"github.com/gavmor/wasm-microkernel/guest"
+	"github.com/gavmor/wasm-microkernel/guest-bindings/plugin_world"
+	host "github.com/gavmor/wasm-microkernel/guest-bindings/podpedia/kernel/host_capabilities"
 	"github.com/samber/lo"
 )
 
 func main() {}
 
-//go:wasmexport allocate
-func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
+func init() { plugin_world.SetExportsPluginWorld(&StorePlugin{}) }
 
-//go:wasmexport Execute
-func Execute(offset, length uint32) uint64 {
-	return abi.Delegate(offset, length, func(in []byte) []byte {
-		var probe map[string]json.RawMessage
-		if err := json.Unmarshal(in, &probe); err != nil {
-			return errBytes("bad request: " + err.Error())
-		}
-		switch {
-		case lo.HasKey(probe, "episode"):
-			return handleRaw(in)
-		case lo.HasKey(probe, "entry"):
-			return handleStructured(in)
-		default:
-			return errBytes("request must contain 'episode' or 'entry'")
-		}
-	})
+type StorePlugin struct{}
+
+func (s *StorePlugin) Execute(reqJSON string) (plugin_world.Result[string, string], error) {
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(reqJSON), &probe); err != nil {
+		return plugin_world.Err[string, string]("bad request: " + err.Error()), nil
+	}
+	switch {
+	case lo.HasKey(probe, "episode"):
+		return handleRaw([]byte(reqJSON))
+	case lo.HasKey(probe, "entry"):
+		return handleStructured([]byte(reqJSON))
+	default:
+		return plugin_world.Err[string, string]("request must contain 'episode' or 'entry'"), nil
+	}
 }
 
-func handleRaw(in []byte) []byte {
+func handleRaw(in []byte) (plugin_world.Result[string, string], error) {
 	var req struct {
 		OutputDir string `json:"output_dir"`
 		Episode   struct {
@@ -49,24 +47,24 @@ func handleRaw(in []byte) []byte {
 		} `json:"episode"`
 	}
 	if err := json.Unmarshal(in, &req); err != nil {
-		return errBytes("bad raw request: " + err.Error())
+		return plugin_world.Err[string, string]("bad raw request: " + err.Error()), nil
 	}
 	path := fmt.Sprintf("%s/%s_raw.txt", req.OutputDir, slug(req.Episode.ID))
 	content, _ := lo.Coalesce(req.Episode.Transcript, fmt.Sprintf("# %s\n\n(no transcript)\n", req.Episode.Title))
-	if !guest.FileWrite(path, content) {
-		return errBytes("file_write failed: " + path)
+	if err := host.FileWrite(path, content); err != nil {
+		return plugin_world.Err[string, string]("host file-write failed: " + err.Error()), nil
 	}
-	guest.Log("stored raw: " + path)
-	return []byte(fmt.Sprintf(`{"path":%q}`, path))
+	host.LogMsg("stored raw: " + path)
+	return plugin_world.Ok[string, string](fmt.Sprintf(`{"path":%q}`, path)), nil
 }
 
-func handleStructured(in []byte) []byte {
+func handleStructured(in []byte) (plugin_world.Result[string, string], error) {
 	var req struct {
 		OutputDir string          `json:"output_dir"`
 		Entry     json.RawMessage `json:"entry"`
 	}
 	if err := json.Unmarshal(in, &req); err != nil {
-		return errBytes("bad structured request: " + err.Error())
+		return plugin_world.Err[string, string]("bad structured request: " + err.Error()), nil
 	}
 	var meta struct {
 		EpisodeID string `json:"episode_id"`
@@ -75,11 +73,11 @@ func handleStructured(in []byte) []byte {
 
 	path := fmt.Sprintf("%s/%s_entry.json", req.OutputDir, slug(meta.EpisodeID))
 	pretty, _ := json.MarshalIndent(json.RawMessage(req.Entry), "", "  ")
-	if !guest.FileWrite(path, string(pretty)) {
-		return errBytes("file_write failed: " + path)
+	if err := host.FileWrite(path, string(pretty)); err != nil {
+		return plugin_world.Err[string, string]("host file-write failed: " + err.Error()), nil
 	}
-	guest.Log("stored entry: " + path)
-	return []byte(fmt.Sprintf(`{"path":%q}`, path))
+	host.LogMsg("stored entry: " + path)
+	return plugin_world.Ok[string, string](fmt.Sprintf(`{"path":%q}`, path)), nil
 }
 
 func slug(s string) string {
@@ -91,8 +89,4 @@ func slug(s string) string {
 			return '_'
 		}
 	}, s)
-}
-
-func errBytes(msg string) []byte {
-	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
 }

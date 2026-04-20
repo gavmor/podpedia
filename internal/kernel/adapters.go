@@ -22,8 +22,12 @@ func (t *WasmTranscriber) Transcribe(audioURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	payload, err := unwrapResult(raw)
+	if err != nil {
+		return "", err
+	}
 	var resp protocol.TranscribeResponse
-	if err := json.Unmarshal(raw, &resp); err != nil {
+	if err := json.Unmarshal(payload, &resp); err != nil {
 		return "", fmt.Errorf("transcriber response: %w", err)
 	}
 	return resp.Transcript, nil

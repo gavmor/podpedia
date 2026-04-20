@@ -10,6 +10,8 @@ github.com/gavmor/wasm-microkernel v0.2.0 h1:ZAue5RrZvTWPPTZvw4JaSG8FynWQQATAts+
 github.com/gavmor/wasm-microkernel v0.2.0/go.mod h1:B0OZkn6KcmZqAIXDwVDKohWHa8rMk3KtF7XKxBXA6gw=
 github.com/gavmor/wasm-microkernel v0.4.0 h1:20heEGQtp4ZgLk5V/sNWuqCFiZBMtqMPDd9d0Mq7zCs=
 github.com/gavmor/wasm-microkernel v0.4.0/go.mod h1:Iw3V9FrN/HVqTP8LqtdVEj3yPZNFu/DdS89hF7Xt2aM=
+github.com/gavmor/wasm-microkernel v0.5.0 h1:IZQXLFexEaADTymBGWua5sY+rB3nILIiYtaZEnwNPP0=
+github.com/gavmor/wasm-microkernel v0.5.0/go.mod h1:Iw3V9FrN/HVqTP8LqtdVEj3yPZNFu/DdS89hF7Xt2aM=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
