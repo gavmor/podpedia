@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -24,7 +25,7 @@ func Run(rssURL string) error {
 	}
 	fmt.Printf("[Pipeline] Found %d valid episodes in feed.\n", len(episodes))
 
-	maxConcurrentWorkers := 3
+	maxConcurrentWorkers := runtime.NumCPU()
 	if val, ok := os.LookupEnv("PODPEDIA_MAX_WORKERS"); ok {
 		fmt.Printf("[Pipeline] Using custom concurrency limit: %s\n", val)
 		// In a real app, you'd parse this to int.
