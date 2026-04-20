@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/gavmor/wasm-microkernel/abi"
@@ -25,32 +26,32 @@ func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
 
 //go:wasmexport Execute
 func Execute(offset, length uint32) uint64 {
-	return abi.Delegate(offset, length, func(input []byte) []byte {
+	return abi.Delegate(offset, length, func(in []byte) []byte {
 		var req struct {
 			URL  string `json:"url"`
 			Dest string `json:"dest"`
 		}
-		if err := json.Unmarshal(input, &req); err != nil {
+		if err := json.Unmarshal(in, &req); err != nil {
 			return errBytes("bad request: " + err.Error())
 		}
-		if req.URL == "" {
+
+		switch {
+		case req.URL == "":
 			return errBytes("url required")
-		}
-		if req.Dest == "" {
+		case req.Dest == "":
 			return errBytes("dest required")
-		}
-		if !strings.HasPrefix(req.URL, "http") {
+		case !strings.HasPrefix(req.URL, "http"):
 			return errBytes("url must be http(s)")
 		}
 
 		logMsg("downloading " + req.URL)
-		payload, _ := json.Marshal(map[string]string{"url": req.URL, "dest": req.Dest})
-		if hostHTTPDownload(abi.ReturnBytes(payload)) == 0 {
+		p, _ := json.Marshal(req)
+
+		if hostHTTPDownload(abi.ReturnBytes(p)) == 0 {
 			return errBytes("download failed: " + req.URL)
 		}
 
-		out, _ := json.Marshal(map[string]string{"path": req.Dest})
-		return out
+		return []byte(fmt.Sprintf(`{"path":%q}`, req.Dest))
 	})
 }
 
