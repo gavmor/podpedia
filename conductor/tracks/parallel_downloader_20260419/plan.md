@@ -12,3 +12,10 @@
     - [x] Write Tests: Verify the integration by downloading a small test file using the library. 8976208
     - [x] Implement: Wrap the library's download logic in \`internal/pipeline/downloader.go\`. 8976208
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Got Library Integration' (Protocol in workflow.md)
+
+## Phase 3: Reassembly & Pipeline Integration
+- [x] Task: Integrate with main pipeline \`Run\` loop 503b8e4
+    - [x] Write Tests: Ensure the pipeline uses the new parallel downloader for episodes. 503b8e4
+    - [x] Implement: Replace the mock/placeholder download logic in \`processEpisode\`. 503b8e4
+- [ ] Task: Conductor - User Manual Verification 'Phase 3: Reassembly & Pipeline Integration' (Protocol in workflow.md)
+
