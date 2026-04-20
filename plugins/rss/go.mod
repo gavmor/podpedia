@@ -2,7 +2,7 @@ module github.com/gavmor/podpedia/plugins/rss
 
 go 1.26.1
 
-require github.com/gavmor/wasm-microkernel v0.2.0
+require github.com/gavmor/wasm-microkernel v0.4.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect

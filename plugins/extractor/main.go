@@ -1,27 +1,21 @@
 //go:build wasip1
 
 // Plugin: extractor
-// Receives an Episode and extracts structured entities (guests, companies)
-// by POSTing to Ollama via the host's generic http_post capability.
-// Swap this plugin to change models, prompt strategies, or output schemas.
+// Extracts structured entities from podcast episodes by calling Ollama
+// via the host's generic http-post capability. Swap this plugin to change
+// models, prompts, or output schemas without touching the kernel.
 package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"unsafe"
 
 	"github.com/gavmor/wasm-microkernel/abi"
+	"github.com/gavmor/wasm-microkernel/guest"
 )
 
 func main() {}
-
-//go:wasmimport podpedia_host http_post
-func hostHTTPPost(fatPtr uint64) uint64
-
-//go:wasmimport podpedia_host log
-func hostLog(fatPtr uint64)
 
 //go:wasmexport allocate
 func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
@@ -43,18 +37,27 @@ func Execute(offset, length uint32) uint64 {
 		}
 
 		ep := req.Episode
-		logMsg("extracting: " + ep.Title)
-		prompt := buildPrompt(ep.Title, ep.Description, ep.Transcript)
-		completion := callOllama(req.OllamaURL, prompt)
+		guest.Log("extracting: " + ep.Title)
+
+		reqBody, _ := json.Marshal(map[string]any{
+			"model":  "qwen3.5:27b",
+			"prompt": buildPrompt(ep.Title, ep.Description, ep.Transcript),
+			"stream": false,
+		})
+		raw := guest.HTTPPost(req.OllamaURL+"/api/generate", string(reqBody))
+
+		var ollamaResp struct {
+			Response string `json:"response"`
+		}
+		completion := ""
+		if err := json.Unmarshal(raw, &ollamaResp); err == nil {
+			completion = ollamaResp.Response
+		}
 
 		entry, err := parseCompletion(ep.ID, completion)
 		if err != nil {
-			logMsg("parse failed, returning empty entry: " + err.Error())
-			entry = map[string]any{
-				"episode_id": ep.ID,
-				"guests":     []any{},
-				"companies":  []any{},
-			}
+			guest.Log("parse failed, returning empty entry: " + err.Error())
+			entry = map[string]any{"episode_id": ep.ID, "guests": []any{}, "companies": []any{}}
 		}
 
 		out, _ := json.Marshal(map[string]any{"entry": entry})
@@ -73,28 +76,6 @@ func buildPrompt(title, description, transcript string) string {
 Episode: %s
 Content: %s
 JSON:`, title, content)
-}
-
-func callOllama(ollamaURL, prompt string) string {
-	reqBody, _ := json.Marshal(map[string]any{
-		"model":  "qwen3.5:27b",
-		"prompt": prompt,
-		"stream": false,
-	})
-	postReq, _ := json.Marshal(map[string]string{
-		"url":  ollamaURL + "/api/generate",
-		"body": string(reqBody),
-	})
-	result := hostHTTPPost(abi.ReturnBytes(postReq))
-	off, ln := abi.DecodeFatPointer(result)
-	raw := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(off))), ln)
-	var resp struct {
-		Response string `json:"response"`
-	}
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return string(raw)
-	}
-	return resp.Response
 }
 
 func parseCompletion(episodeID, raw string) (map[string]any, error) {
@@ -125,7 +106,6 @@ func parseCompletion(episodeID, raw string) (map[string]any, error) {
 	}, nil
 }
 
-func logMsg(s string) { hostLog(abi.ReturnBytes([]byte(s))) }
 func errBytes(msg string) []byte {
 	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
 }

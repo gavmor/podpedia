@@ -1,8 +1,8 @@
 //go:build wasip1
 
 // Plugin: downloader
-// Delegates audio file download to the host's http_download capability.
-// Owns validation and path normalization; the host owns the HTTP socket.
+// Validates the request and delegates audio file download to the host's
+// http-download capability. Owns validation; the host owns the HTTP socket.
 package main
 
 import (
@@ -11,15 +11,10 @@ import (
 	"strings"
 
 	"github.com/gavmor/wasm-microkernel/abi"
+	"github.com/gavmor/wasm-microkernel/guest"
 )
 
 func main() {}
-
-//go:wasmimport podpedia_host http_download
-func hostHTTPDownload(fatPtr uint64) uint32
-
-//go:wasmimport podpedia_host log
-func hostLog(fatPtr uint64)
 
 //go:wasmexport allocate
 func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
@@ -44,10 +39,9 @@ func Execute(offset, length uint32) uint64 {
 			return errBytes("url must be http(s)")
 		}
 
-		logMsg("downloading " + req.URL)
-		p, _ := json.Marshal(req)
+		guest.Log("downloading " + req.URL)
 
-		if hostHTTPDownload(abi.ReturnBytes(p)) == 0 {
+		if !guest.HTTPDownload(req.URL, req.Dest) {
 			return errBytes("download failed: " + req.URL)
 		}
 
@@ -55,8 +49,6 @@ func Execute(offset, length uint32) uint64 {
 	})
 }
 
-func logMsg(s string) { hostLog(abi.ReturnBytes([]byte(s))) }
 func errBytes(msg string) []byte {
-	b, _ := json.Marshal(map[string]string{"error": msg})
-	return b
+	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
 }

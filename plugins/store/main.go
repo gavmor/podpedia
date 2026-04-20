@@ -1,7 +1,7 @@
 //go:build wasip1
 
 // Plugin: store
-// Persists transcripts and encyclopedia entries via the host's file_write
+// Persists transcripts and encyclopedia entries via the host's file-write
 // capability. Owns all path construction and serialization format decisions.
 // Swap this plugin to change output format (markdown, SQLite, S3, etc.)
 package main
@@ -12,16 +12,11 @@ import (
 	"strings"
 
 	"github.com/gavmor/wasm-microkernel/abi"
+	"github.com/gavmor/wasm-microkernel/guest"
 	"github.com/samber/lo"
 )
 
 func main() {}
-
-//go:wasmimport podpedia_host file_write
-func hostFileWrite(fatPtr uint64) uint32
-
-//go:wasmimport podpedia_host log
-func hostLog(fatPtr uint64)
 
 //go:wasmexport allocate
 func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
@@ -58,10 +53,10 @@ func handleRaw(in []byte) []byte {
 	}
 	path := fmt.Sprintf("%s/%s_raw.txt", req.OutputDir, slug(req.Episode.ID))
 	content, _ := lo.Coalesce(req.Episode.Transcript, fmt.Sprintf("# %s\n\n(no transcript)\n", req.Episode.Title))
-	if !writeFile(path, content) {
+	if !guest.FileWrite(path, content) {
 		return errBytes("file_write failed: " + path)
 	}
-	logMsg("stored raw: " + path)
+	guest.Log("stored raw: " + path)
 	return []byte(fmt.Sprintf(`{"path":%q}`, path))
 }
 
@@ -80,16 +75,11 @@ func handleStructured(in []byte) []byte {
 
 	path := fmt.Sprintf("%s/%s_entry.json", req.OutputDir, slug(meta.EpisodeID))
 	pretty, _ := json.MarshalIndent(json.RawMessage(req.Entry), "", "  ")
-	if !writeFile(path, string(pretty)) {
+	if !guest.FileWrite(path, string(pretty)) {
 		return errBytes("file_write failed: " + path)
 	}
-	logMsg("stored entry: " + path)
+	guest.Log("stored entry: " + path)
 	return []byte(fmt.Sprintf(`{"path":%q}`, path))
-}
-
-func writeFile(path, data string) bool {
-	payload, _ := json.Marshal(map[string]string{"path": path, "data": data})
-	return hostFileWrite(abi.ReturnBytes(payload)) == 1
 }
 
 func slug(s string) string {
@@ -103,7 +93,6 @@ func slug(s string) string {
 	}, s)
 }
 
-func logMsg(s string) { hostLog(abi.ReturnBytes([]byte(s))) }
 func errBytes(msg string) []byte {
 	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
 }

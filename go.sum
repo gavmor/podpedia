@@ -18,6 +18,10 @@ github.com/gavmor/wasm-microkernel v0.2.0 h1:ZAue5RrZvTWPPTZvw4JaSG8FynWQQATAts+
 github.com/gavmor/wasm-microkernel v0.2.0/go.mod h1:B0OZkn6KcmZqAIXDwVDKohWHa8rMk3KtF7XKxBXA6gw=
 github.com/gavmor/wasm-microkernel v0.3.0 h1:SJBKLNCnwF9SM0bNRy5dNMSIc1cJHzA+/Eoq4fXAdO8=
 github.com/gavmor/wasm-microkernel v0.3.0/go.mod h1:B0OZkn6KcmZqAIXDwVDKohWHa8rMk3KtF7XKxBXA6gw=
+github.com/gavmor/wasm-microkernel v0.4.0 h1:20heEGQtp4ZgLk5V/sNWuqCFiZBMtqMPDd9d0Mq7zCs=
+github.com/gavmor/wasm-microkernel v0.4.0/go.mod h1:Iw3V9FrN/HVqTP8LqtdVEj3yPZNFu/DdS89hF7Xt2aM=
+github.com/gavmor/wasm-microkernel v0.4.1 h1:nFlukCgY7gKI2RtXYfQUzXzemCaWzLgARFenw6M8CxI=
+github.com/gavmor/wasm-microkernel v0.4.1/go.mod h1:Iw3V9FrN/HVqTP8LqtdVEj3yPZNFu/DdS89hF7Xt2aM=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=
