@@ -14,3 +14,6 @@
 - [x] Task: Map iTunes and Dublin Core extensions to internal types 5559643
 - [x] Task: Clean up and remove legacy \`parseRSS\` and \`fetchFeedContent\` functions from \`pipeline.go\` 474c08d
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Gofeed Integration' (Protocol in workflow.md) [checkpoint: ea82dac]
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions e516bcc
