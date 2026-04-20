@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -72,6 +74,24 @@ func processEpisode(ep types.Episode) {
 	}
 
 	fmt.Printf("[Worker] Completed Episode: %s\n", ep.Title)
+}
+
+func fetchFeedContent(url string) ([]byte, error) {
+	fmt.Printf("[Pipeline] Fetching RSS content from: %s\n", url)
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
 }
 
 func fetchRSSFeed(url string) []types.Episode {
