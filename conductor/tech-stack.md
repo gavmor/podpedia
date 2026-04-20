@@ -21,6 +21,8 @@
 - **Logging:** [lager](https://github.com/cloudfoundry/lager) - Structured JSON logging for high-scale observability.
 
 ## Testing & Quality
+- **CI/CD:** [GitHub Actions](https://github.com/features/actions) - Automated testing, linting, and security scanning.
+- **Release Orchestration:** [GoReleaser](https://goreleaser.com/) - Automated binary compilation and GitHub Release management.
 - **BDD Framework:** [Ginkgo V2](https://github.com/onsi/ginkgo) - Behavior-Driven Development for expressive, documentation-like tests.
 - **Matcher Library:** [Gomega](https://github.com/onsi/gomega) - Expressive, asynchronous matchers for Go.
 - **Mocking:** [counterfeiter](https://github.com/maxbrunsfeld/counterfeiter) - Generates type-safe fakes for consumer-driven interfaces.
