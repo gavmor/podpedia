@@ -6,7 +6,7 @@ require (
 	code.cloudfoundry.org/lager/v3 v3.1.0
 	github.com/alitto/pond v1.9.2
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/gavmor/wasm-microkernel v0.4.1
+	github.com/gavmor/wasm-microkernel v0.5.1
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/onsi/ginkgo/v2 v2.22.1
 	github.com/onsi/gomega v1.36.1

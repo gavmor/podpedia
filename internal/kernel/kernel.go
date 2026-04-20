@@ -1,7 +1,6 @@
 // Package kernel is the Podpedia-specific boot layer for the wasm-microkernel.
-// It knows Podpedia's module name and wires configuration from CLI flags into
-// the microkernel. Everything below this — wazero, ABI, capability registration
-// — lives in github.com/gavmor/wasm-microkernel.
+// It wires configuration from CLI flags into the microkernel. Everything below
+// this — wazero, ABI, capability registration — lives in github.com/gavmor/wasm-microkernel.
 package kernel
 
 import (
@@ -13,9 +12,6 @@ import (
 	wmk "github.com/gavmor/wasm-microkernel/kernel"
 )
 
-// HostModule is the Wasm import module name all Podpedia plugins use.
-const HostModule = "podpedia_host"
-
 // Kernel wraps the microkernel with Podpedia's URL config, which adapters
 // thread through plugin requests so plugins own the API call logic.
 type Kernel struct {
@@ -25,11 +21,10 @@ type Kernel struct {
 }
 
 // New boots the microkernel with standard capabilities registered under
-// the podpedia_host module name. The host app provides only config.
+// the canonical WIT module name. The host app provides only config.
 func New(ctx context.Context, logger lager.Logger, ollamaURL, transcribeURL string) (*Kernel, error) {
 	k, err := wmk.New(ctx, wmk.Config{
-		ModuleName: HostModule,
-		LogWriter:  lagerWriter{logger},
+		LogWriter: lagerWriter{logger},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("microkernel init: %w", err)
