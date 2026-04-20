@@ -7,6 +7,6 @@
 
 ## Phase 2: XML Parsing & Validation
 - [x] Task: Implement XML parsing logic for RSS feeds 27f74b5
-- [ ] Task: Add validation for required episode fields (Title, Media URL)
+- [x] Task: Add validation for required episode fields (Title, Media URL) d43c9cd
 - [ ] Task: Integrate parser with fetcher in the pipeline
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: XML Parsing & Validation' (Protocol in workflow.md)
