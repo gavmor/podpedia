@@ -25,23 +25,6 @@ type Episode struct {
 	Transcript  string   `xml:"-"`   // Not in RSS
 }
 
-func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	type Alias Episode
-	aux := &struct {
-		Enclosure struct {
-			URL string `xml:"url,attr"`
-		} `xml:"enclosure"`
-		*Alias
-	}{
-		Alias: (*Alias)(e),
-	}
-	if err := d.DecodeElement(aux, &start); err != nil {
-		return err
-	}
-	e.AudioURL = aux.Enclosure.URL
-	return nil
-}
-
 // Guest represents an individual extracted by the LLM
 type Guest struct {
 	Name       string `json:"name"`
