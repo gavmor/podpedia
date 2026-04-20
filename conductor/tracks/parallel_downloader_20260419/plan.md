@@ -1,11 +1,11 @@
 # Implementation Plan: Implement Concurrent Audio Acquisition (Parallel Downloader)
 
-## Phase 1: Size Discovery & Content Validation
+## Phase 1: Size Discovery & Content Validation [checkpoint: d142ff5]
 - [x] Task: Implement \`GetAudioMetadata\` in \`internal/pipeline\` b3c847b
     - [x] Write Tests: Create failing tests for fetching \`Content-Length\` and verifying \`Accept-Ranges: bytes\` support via HTTP HEAD requests. b3c847b
     - [x] Implement: Add logic to determine file size and server capability. b3c847b
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Size Discovery & Content Validation' (Protocol in workflow.md)
 
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Size Discovery & Content Validation' (Protocol in workflow.md)
 
 ## Phase 2: Concurrent Segment Fetching (In-Memory)
 - [ ] Task: Implement core `DownloadSegment` logic
