@@ -7,17 +7,21 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/melbahja/got"
+	"github.com/cavaliergopher/grab/v3"
 )
 
-// DownloadAudio downloads an audio file concurrently using the got library.
+// DownloadAudio downloads an audio file concurrently and robustly using the grab library.
 func DownloadAudio(url string, dest string) error {
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	g := got.New()
-	return g.Download(url, dest)
+	_, err := grab.Get(dest, url)
+	if err != nil {
+		return fmt.Errorf("failed to download file: %w", err)
+	}
+
+	return nil
 }
 
 // GetAudioMetadata fetches the file size and checks for Range request support using an HTTP HEAD request.

@@ -6,7 +6,7 @@
 
 ## Data & Storage
 - **RSS Parser:** [gofeed](https://github.com/mmcdole/gofeed) - Universal feed parser for RSS, Atom, and JSON feeds with support for iTunes and Dublin Core extensions.
-- **File Downloader:** [got](https://github.com/melbahja/got) - High-speed concurrent and resumable downloader using HTTP Range headers.
+- **File Downloader:** [grab](https://github.com/cavaliercoder/grab) - Robust, production-ready concurrent downloader with retry support and CDN quirk handling.
 - **Primary Storage:** Markdown files - Portability and ease of search/editing.
 - **Data Exchange:** JSON - Standard format for structured exports.
 
