@@ -14,12 +14,13 @@ import (
 	"github.com/gavmor/podpedia/internal/storage"
 	"github.com/gavmor/podpedia/internal/transcription"
 	"github.com/gavmor/podpedia/internal/types"
+	"github.com/mmcdole/gofeed"
 )
 
 func Run(rssURL string) error {
 	fmt.Printf("[Pipeline] Starting for feed: %s\n", rssURL)
 
-	episodes, err := fetchRSSFeed(rssURL)
+	_, episodes, err := parseRSSWithGofeed(rssURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch RSS feed: %w", err)
 	}
@@ -81,47 +82,6 @@ func processEpisode(ep types.Episode) {
 	fmt.Printf("[Worker] Completed Episode: %s\n", ep.Title)
 }
 
-func fetchFeedContent(url string) ([]byte, error) {
-	fmt.Printf("[Pipeline] Fetching RSS content from: %s\n", url)
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get URL: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
-	}
-
-	return io.ReadAll(resp.Body)
-}
-
-func parseRSS(content []byte) (types.Podcast, []types.Episode, error) {
-	type RSS struct {
-		XMLName xml.Name `xml:"rss"`
-		Channel struct {
-			Title       string          `xml:"title"`
-			Description string          `xml:"description"`
-			Items       []types.Episode `xml:"item"`
-		} `xml:"channel"`
-	}
-
-	var rss RSS
-	if err := xml.Unmarshal(content, &rss); err != nil {
-		return types.Podcast{}, nil, fmt.Errorf("failed to parse XML: %w", err)
-	}
-
-	podcast := types.Podcast{
-		Title:       rss.Channel.Title,
-		Description: rss.Channel.Description,
-	}
-
-	return podcast, rss.Channel.Items, nil
-}
-
 func validateEpisode(ep types.Episode) error {
 	if ep.Title == "" {
 		return fmt.Errorf("missing episode title")
@@ -132,25 +92,64 @@ func validateEpisode(ep types.Episode) error {
 	return nil
 }
 
-func fetchRSSFeed(url string) ([]types.Episode, error) {
-	content, err := fetchFeedContent(url)
+func parseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
+	fp := gofeed.NewParser()
+	feed, err := fp.ParseURL(url)
 	if err != nil {
-		return nil, err
+		return types.Podcast{}, nil, fmt.Errorf("failed to parse RSS feed: %w", err)
 	}
 
-	_, episodes, err := parseRSS(content)
-	if err != nil {
-		return nil, err
+	podcast := types.Podcast{
+		Title:       feed.Title,
+		Description: feed.Description,
+		URL:         url,
+	}
+	if feed.ITunesExt != nil {
+		podcast.Author = feed.ITunesExt.Author
 	}
 
-	var validEpisodes []types.Episode
-	for _, ep := range episodes {
+	if podcast.Author == "" && feed.Extensions["dc"] != nil {
+		if authors, ok := feed.Extensions["dc"]["creator"]; ok && len(authors) > 0 {
+			podcast.Author = authors[0].Value
+		}
+	}
+
+	var episodes []types.Episode
+	for _, item := range feed.Items {
+		ep := types.Episode{
+			ID:          item.GUID,
+			Title:       item.Title,
+			Description: item.Description,
+			PubDate:     item.Published,
+		}
+
+		if item.ITunesExt != nil {
+			ep.Duration = item.ITunesExt.Duration
+			ep.Explicit = item.ITunesExt.Explicit == "yes"
+			ep.Author = item.ITunesExt.Author
+		}
+
+		if ep.Author == "" && item.Extensions["dc"] != nil {
+			if creators, ok := item.Extensions["dc"]["creator"]; ok && len(creators) > 0 {
+				ep.Author = creators[0].Value
+			}
+		}
+
+		if len(item.Enclosures) > 0 {
+			ep.AudioURL = item.Enclosures[0].URL
+		}
+
 		if err := validateEpisode(ep); err != nil {
 			fmt.Printf("[Pipeline] Skipping invalid episode: %v\n", err)
 			continue
 		}
-		validEpisodes = append(validEpisodes, ep)
+		episodes = append(episodes, ep)
 	}
 
-	return validEpisodes, nil
+	return podcast, episodes, nil
+}
+
+func fetchRSSFeed(url string) ([]types.Episode, error) {
+	_, episodes, err := parseRSSWithGofeed(url)
+	return episodes, err
 }
