@@ -79,7 +79,7 @@ var _ = Describe("Pipeline", func() {
 		BeforeEach(func() {
 			outDir = "test_output_bdd"
 			ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Fprintln(w, `
+				_, _ = fmt.Fprintln(w, `
 					<rss version="2.0">
 						<channel>
 							<title>Test Podcast</title>
@@ -96,7 +96,7 @@ var _ = Describe("Pipeline", func() {
 
 		AfterEach(func() {
 			ts.Close()
-			os.RemoveAll(outDir)
+			_ = os.RemoveAll(outDir)
 		})
 
 		It("successfully runs the pipeline for a feed", func() {

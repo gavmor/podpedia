@@ -44,7 +44,7 @@ var _ = Describe("Gofeed Integration", func() {
 
 		JustBeforeEach(func() {
 			ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Fprintln(w, xmlInput)
+				_, _ = fmt.Fprintln(w, xmlInput)
 			}))
 		})
 

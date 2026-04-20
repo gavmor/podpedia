@@ -90,13 +90,13 @@ var _ = Describe("Downloader", func() {
 			content = "fake audio content"
 			dest = "test_audio_bdd.mp3"
 			ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Fprint(w, content)
+				_, _ = fmt.Fprint(w, content)
 			}))
 		})
 
 		AfterEach(func() {
 			ts.Close()
-			os.Remove(dest)
+			_ = os.Remove(dest)
 		})
 
 		It("downloads the audio file to the specified destination", func() {
