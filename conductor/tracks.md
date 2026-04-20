@@ -6,5 +6,6 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [~] **Track: Update GitHub Actions CI/CD for Tests, Build, and Release**
+- [x] **Track: Update GitHub Actions CI/CD for Tests, Build, and Release**
+
   *Link: [./tracks/github_actions_cicd_20260419/](./tracks/github_actions_cicd_20260419/)*
