@@ -8,9 +8,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"unsafe"
 
 	"github.com/gavmor/wasm-microkernel/abi"
+	"github.com/samber/lo"
 )
 
 func main() {}
@@ -34,11 +36,9 @@ func Execute(offset, length uint32) uint64 {
 		if err := json.Unmarshal(input, &req); err != nil {
 			return errBytes("bad request: " + err.Error())
 		}
-		target := req.AudioPath
-		if target == "" {
-			target = req.AudioURL
-		}
-		if target == "" {
+
+		target, ok := lo.Coalesce(req.AudioPath, req.AudioURL)
+		if !ok {
 			return errBytes("audio_path or audio_url required")
 		}
 
@@ -48,18 +48,17 @@ func Execute(offset, length uint32) uint64 {
 
 		off, ln := abi.DecodeFatPointer(result)
 		raw := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(off))), ln)
+
 		var transcript string
 		if err := json.Unmarshal(raw, &transcript); err != nil {
 			transcript = string(raw)
 		}
 
-		out, _ := json.Marshal(map[string]string{"transcript": transcript})
-		return out
+		return []byte(fmt.Sprintf(`{"transcript":%q}`, transcript))
 	})
 }
 
 func logMsg(s string) { hostLog(abi.ReturnBytes([]byte(s))) }
 func errBytes(msg string) []byte {
-	b, _ := json.Marshal(map[string]string{"error": msg})
-	return b
+	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
 }
