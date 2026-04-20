@@ -111,7 +111,7 @@ func (k *Kernel) Call(name string, input any) ([]byte, error) {
 	}
 	out, err := execute.Call(k.ctx, uint64(offset), uint64(len(payload)))
 	if err != nil {
-		return nil, fmt.Errorf("Execute: %w", err)
+		return nil, fmt.Errorf("execute: %w", err)
 	}
 
 	ptr, size := abi.DecodeFatPointer(out[0])
@@ -301,7 +301,7 @@ func (k *Kernel) ollamaInfer(prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var result struct {
 		Response string `json:"response"`
 	}
