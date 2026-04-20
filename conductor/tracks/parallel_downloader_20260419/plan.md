@@ -6,13 +6,9 @@
     - [x] Implement: Add logic to determine file size and server capability. b3c847b
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Size Discovery & Content Validation' (Protocol in workflow.md)
 
-## Phase 2: Got Library Integration
+## Phase 2: Got Library Integration [checkpoint: bcbe3c2]
 - [x] Task: Add \`github.com/melbahja/got\` to \`go.mod\` 40658eb
 - [x] Task: Implement \`DownloadAudio\` using \`got.Download\` 8976208
     - [x] Write Tests: Verify the integration by downloading a small test file using the library. 8976208
     - [x] Implement: Wrap the library's download logic in \`internal/pipeline/downloader.go\`. 8976208
-
-- [ ] Task: Integrate with main pipeline `Run` loop
-    - [ ] Write Tests: Ensure the pipeline uses the new parallel downloader for episodes.
-    - [ ] Implement: Replace the mock/placeholder download logic in `processEpisode`.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Got Library Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Got Library Integration' (Protocol in workflow.md)
