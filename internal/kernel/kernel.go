@@ -50,7 +50,7 @@ func New(ctx context.Context, logger lager.Logger, ollamaURL string) (*Kernel, e
 	}
 
 	if err := k.registerCapabilities(); err != nil {
-		r.Close(ctx)
+		_ = r.Close(ctx)
 		return nil, fmt.Errorf("registering host capabilities: %w", err)
 	}
 	return k, nil
@@ -119,7 +119,7 @@ func (k *Kernel) Call(name string, input any) ([]byte, error) {
 }
 
 // Close shuts down the wazero runtime.
-func (k *Kernel) Close() { k.runtime.Close(k.ctx) }
+func (k *Kernel) Close() { _ = k.runtime.Close(k.ctx) }
 
 // ── Host capabilities ─────────────────────────────────────────────────────────
 
@@ -184,7 +184,11 @@ func (k *Kernel) registerCapabilities() error {
 			off, ln := abi.DecodeFatPointer(stack[0])
 			promptJSON, _ := abi.ReadGuestBuffer(ctx, mod, off, ln)
 			var prompt string
-			json.Unmarshal(promptJSON, &prompt)
+			if err := json.Unmarshal(promptJSON, &prompt); err != nil {
+				k.logger.Error("llm-infer-unmarshal", err)
+				stack[0] = hostWriteToGuest(ctx, mod, []byte(`""`))
+				return
+			}
 
 			result, err := k.ollamaInfer(prompt)
 			if err != nil {
@@ -264,7 +268,7 @@ func httpGet(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return io.ReadAll(resp.Body)
 }
 
@@ -276,12 +280,12 @@ func downloadFile(url, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	f, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, err = io.Copy(f, resp.Body)
 	return err
 }

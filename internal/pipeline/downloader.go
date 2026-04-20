@@ -36,7 +36,7 @@ func (d *Downloader) FetchMetadata(url string) (int64, bool, error) {
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to execute HEAD request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, false, fmt.Errorf("bad status code: %d", resp.StatusCode)
