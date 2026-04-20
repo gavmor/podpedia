@@ -1,10 +1,7 @@
 package pipeline
 
 import (
-	"encoding/xml"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"runtime"
 	"sync"
@@ -103,6 +100,7 @@ func parseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 		Title:       feed.Title,
 		Description: feed.Description,
 		URL:         url,
+		Categories:  feed.Categories,
 	}
 	if feed.ITunesExt != nil {
 		podcast.Author = feed.ITunesExt.Author
@@ -128,6 +126,8 @@ func parseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 			ep.Explicit = item.ITunesExt.Explicit == "yes"
 			ep.Author = item.ITunesExt.Author
 		}
+
+		ep.Categories = item.Categories
 
 		if ep.Author == "" && item.Extensions["dc"] != nil {
 			if creators, ok := item.Extensions["dc"]["creator"]; ok && len(creators) > 0 {

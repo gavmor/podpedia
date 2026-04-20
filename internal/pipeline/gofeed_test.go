@@ -14,6 +14,8 @@ func TestParseWithGofeed(t *testing.T) {
 				<title>Integrated Podcast</title>
 				<description>A podcast for testing gofeed</description>
 				<itunes:author>Test Author</itunes:author>
+				<category>Technology</category>
+				<category>Science</category>
 				<item>
 					<title>Integrated Episode</title>
 					<description>Testing metadata extraction</description>
@@ -23,6 +25,7 @@ func TestParseWithGofeed(t *testing.T) {
 					<itunes:duration>00:45:00</itunes:duration>
 					<itunes:explicit>yes</itunes:explicit>
 					<dc:creator>Dublin Core Creator</dc:creator>
+					<category>News</category>
 				</item>
 			</channel>
 		</rss>
@@ -45,6 +48,9 @@ func TestParseWithGofeed(t *testing.T) {
 	if podcast.Author != "Test Author" {
 		t.Errorf("Expected podcast author 'Test Author', got '%s'", podcast.Author)
 	}
+	if len(podcast.Categories) != 2 {
+		t.Errorf("Expected 2 categories, got %d", len(podcast.Categories))
+	}
 
 	if len(episodes) != 1 {
 		t.Fatalf("Expected 1 episode, got %d", len(episodes))
@@ -62,5 +68,8 @@ func TestParseWithGofeed(t *testing.T) {
 	}
 	if ep.Author != "Dublin Core Creator" {
 		t.Errorf("Expected author 'Dublin Core Creator', got '%s'", ep.Author)
+	}
+	if len(ep.Categories) != 1 || ep.Categories[0] != "News" {
+		t.Errorf("Expected 1 category 'News', got %v", ep.Categories)
 	}
 }
