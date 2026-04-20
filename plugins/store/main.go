@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gavmor/wasm-microkernel/abi"
+	"github.com/samber/lo"
 )
 
 func main() {}
@@ -27,23 +28,23 @@ func allocate(size uint32) uint32 { return abi.GuestAllocate(size) }
 
 //go:wasmexport Execute
 func Execute(offset, length uint32) uint64 {
-	return abi.Delegate(offset, length, func(input []byte) []byte {
-		// Dispatch on which fields are present.
+	return abi.Delegate(offset, length, func(in []byte) []byte {
 		var probe map[string]json.RawMessage
-		if err := json.Unmarshal(input, &probe); err != nil {
+		if err := json.Unmarshal(in, &probe); err != nil {
 			return errBytes("bad request: " + err.Error())
 		}
-		if _, ok := probe["episode"]; ok {
-			return handleRaw(input)
+		switch {
+		case lo.HasKey(probe, "episode"):
+			return handleRaw(in)
+		case lo.HasKey(probe, "entry"):
+			return handleStructured(in)
+		default:
+			return errBytes("request must contain 'episode' or 'entry'")
 		}
-		if _, ok := probe["entry"]; ok {
-			return handleStructured(input)
-		}
-		return errBytes("request must contain 'episode' or 'entry'")
 	})
 }
 
-func handleRaw(input []byte) []byte {
+func handleRaw(in []byte) []byte {
 	var req struct {
 		OutputDir string `json:"output_dir"`
 		Episode   struct {
@@ -52,36 +53,30 @@ func handleRaw(input []byte) []byte {
 			Transcript string `json:"transcript"`
 		} `json:"episode"`
 	}
-	if err := json.Unmarshal(input, &req); err != nil {
+	if err := json.Unmarshal(in, &req); err != nil {
 		return errBytes("bad raw request: " + err.Error())
 	}
 	path := fmt.Sprintf("%s/%s_raw.txt", req.OutputDir, slug(req.Episode.ID))
-	content := req.Episode.Transcript
-	if content == "" {
-		content = "# " + req.Episode.Title + "\n\n(no transcript)\n"
-	}
+	content, _ := lo.Coalesce(req.Episode.Transcript, fmt.Sprintf("# %s\n\n(no transcript)\n", req.Episode.Title))
 	if !writeFile(path, content) {
 		return errBytes("file_write failed: " + path)
 	}
 	logMsg("stored raw: " + path)
-	out, _ := json.Marshal(map[string]string{"path": path})
-	return out
+	return []byte(fmt.Sprintf(`{"path":%q}`, path))
 }
 
-func handleStructured(input []byte) []byte {
+func handleStructured(in []byte) []byte {
 	var req struct {
 		OutputDir string          `json:"output_dir"`
 		Entry     json.RawMessage `json:"entry"`
 	}
-	if err := json.Unmarshal(input, &req); err != nil {
+	if err := json.Unmarshal(in, &req); err != nil {
 		return errBytes("bad structured request: " + err.Error())
 	}
-
-	// Extract episode_id from the entry for the filename.
 	var meta struct {
 		EpisodeID string `json:"episode_id"`
 	}
-	json.Unmarshal(req.Entry, &meta)
+	_ = json.Unmarshal(req.Entry, &meta)
 
 	path := fmt.Sprintf("%s/%s_entry.json", req.OutputDir, slug(meta.EpisodeID))
 	pretty, _ := json.MarshalIndent(json.RawMessage(req.Entry), "", "  ")
@@ -89,8 +84,7 @@ func handleStructured(input []byte) []byte {
 		return errBytes("file_write failed: " + path)
 	}
 	logMsg("stored entry: " + path)
-	out, _ := json.Marshal(map[string]string{"path": path})
-	return out
+	return []byte(fmt.Sprintf(`{"path":%q}`, path))
 }
 
 func writeFile(path, data string) bool {
@@ -99,20 +93,17 @@ func writeFile(path, data string) bool {
 }
 
 func slug(s string) string {
-	var b strings.Builder
-	for _, c := range s {
+	return strings.Map(func(r rune) rune {
 		switch {
-		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == '-':
-			b.WriteRune(c)
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-':
+			return r
 		default:
-			b.WriteByte('_')
+			return '_'
 		}
-	}
-	return b.String()
+	}, s)
 }
 
 func logMsg(s string) { hostLog(abi.ReturnBytes([]byte(s))) }
 func errBytes(msg string) []byte {
-	b, _ := json.Marshal(map[string]string{"error": msg})
-	return b
+	return []byte(fmt.Sprintf(`{"error":%q}`, msg))
 }
