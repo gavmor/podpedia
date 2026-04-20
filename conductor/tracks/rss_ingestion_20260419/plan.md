@@ -1,7 +1,7 @@
 # Implementation Plan: Implement RSS Feed Ingestion and Basic Episode Parsing
 
 ## Phase 1: Ingestion Scaffolding
-- [ ] Task: Define episode and podcast metadata types in `internal/types`
+- [x] Task: Define episode and podcast metadata types in `internal/types` 723f331
 - [ ] Task: Implement RSS feed fetcher in `internal/pipeline`
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Ingestion Scaffolding' (Protocol in workflow.md)
 
