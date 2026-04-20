@@ -18,8 +18,11 @@ import (
 func Run(rssURL string) error {
 	fmt.Printf("[Pipeline] Starting for feed: %s\n", rssURL)
 
-	episodes := fetchRSSFeed(rssURL)
-	fmt.Printf("[Pipeline] Found %d episodes in feed.\n", len(episodes))
+	episodes, err := fetchRSSFeed(rssURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch RSS feed: %w", err)
+	}
+	fmt.Printf("[Pipeline] Found %d valid episodes in feed.\n", len(episodes))
 
 	maxConcurrentWorkers := 3
 	if val, ok := os.LookupEnv("PODPEDIA_MAX_WORKERS"); ok {
@@ -128,13 +131,25 @@ func validateEpisode(ep types.Episode) error {
 	return nil
 }
 
-func fetchRSSFeed(url string) []types.Episode {
-	fmt.Printf("[Pipeline] Fetching RSS feed from: %s\n", url)
-	return []types.Episode{
-		{ID: "ep001", Title: "The Future of AI", AudioURL: "http://audio.com/ep001.mp3"},
-		{ID: "ep002", Title: "SaaS Business Models", AudioURL: "http://audio.com/ep002.mp3"},
-		{ID: "ep003", Title: "Open Source Ideology", AudioURL: "http://audio.com/ep003.mp3"},
-		{ID: "ep004", Title: "Hardware for LLMs", AudioURL: "http://audio.com/ep004.mp3"},
-		{ID: "ep005", Title: "Podcast Monetization", AudioURL: "http://audio.com/ep005.mp3"},
+func fetchRSSFeed(url string) ([]types.Episode, error) {
+	content, err := fetchFeedContent(url)
+	if err != nil {
+		return nil, err
 	}
+
+	_, episodes, err := parseRSS(content)
+	if err != nil {
+		return nil, err
+	}
+
+	var validEpisodes []types.Episode
+	for _, ep := range episodes {
+		if err := validateEpisode(ep); err != nil {
+			fmt.Printf("[Pipeline] Skipping invalid episode: %v\n", err)
+			continue
+		}
+		validEpisodes = append(validEpisodes, ep)
+	}
+
+	return validEpisodes, nil
 }
