@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gavmor/podpedia/internal/types"
@@ -77,5 +78,33 @@ func TestFetchRSSFeedIntegration(t *testing.T) {
 
 	if episodes[0].Title != "Integrated Episode" {
 		t.Errorf("Expected 'Integrated Episode', got '%s'", episodes[0].Title)
+	}
+}
+
+func TestProcessEpisodeDownload(t *testing.T) {
+	content := "fake audio content"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, content)
+	}))
+	defer ts.Close()
+
+	ep := types.Episode{
+		ID:       "test-ep",
+		Title:    "Test Episode",
+		AudioURL: ts.URL,
+	}
+
+	outDir := "test_output"
+	defer os.RemoveAll(outDir)
+
+	// Since transcription and LLM are mocked, this should still work
+	processEpisode(ep, outDir)
+
+	// Verify audio file exists in outDir
+	// The path should be outDir/ep.ID.mp3 (or similar, depending on implementation)
+	// Currently processEpisode doesn't download audio. We want it to.
+	audioPath := outDir + "/" + ep.ID + ".mp3"
+	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
+		t.Errorf("Expected audio file at %s, but it was not found", audioPath)
 	}
 }

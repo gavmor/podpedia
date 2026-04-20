@@ -54,6 +54,16 @@ func Run(rssURL string, outputDir string) error {
 func processEpisode(ep types.Episode, outputDir string) {
 	fmt.Printf("[Worker] Starting Episode: %s\n", ep.Title)
 
+	// Download audio if needed
+	audioPath := fmt.Sprintf("%s/%s.mp3", outputDir, ep.ID)
+	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
+		fmt.Printf("[Worker] Downloading audio for: %s\n", ep.Title)
+		if err := DownloadAudio(ep.AudioURL, audioPath); err != nil {
+			fmt.Printf("[Worker] ERROR: Failed to download audio for %s: %v\n", ep.ID, err)
+			return
+		}
+	}
+
 	if ep.Transcript == "" {
 		transcript, err := transcription.Transcribe(ep.AudioURL)
 		if err != nil {

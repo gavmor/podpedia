@@ -3,6 +3,8 @@ package pipeline
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/melbahja/got"
@@ -10,6 +12,10 @@ import (
 
 // DownloadAudio downloads an audio file concurrently using the got library.
 func DownloadAudio(url string, dest string) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	g := got.New()
 	return g.Download(url, dest)
 }
