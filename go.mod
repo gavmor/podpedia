@@ -1,9 +1,9 @@
 module github.com/gavmor/podpedia
 
-go 1.23.0
+go 1.25.0
 
 require (
-	code.cloudfoundry.org/lager/v3 v3.66.0
+	code.cloudfoundry.org/lager/v3 v3.1.0
 	github.com/alitto/pond v1.9.2
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/mmcdole/gofeed v1.3.0
