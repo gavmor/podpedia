@@ -8,9 +8,10 @@
 
 ## Phase 2: Got Library Integration
 - [x] Task: Add \`github.com/melbahja/got\` to \`go.mod\` 40658eb
-- [ ] Task: Implement `DownloadAudio` using `got.Download`
-    - [ ] Write Tests: Verify the integration by downloading a small test file using the library.
-    - [ ] Implement: Wrap the library's download logic in `internal/pipeline/downloader.go`.
+- [x] Task: Implement \`DownloadAudio\` using \`got.Download\` 8976208
+    - [x] Write Tests: Verify the integration by downloading a small test file using the library. 8976208
+    - [x] Implement: Wrap the library's download logic in \`internal/pipeline/downloader.go\`. 8976208
+
 - [ ] Task: Integrate with main pipeline `Run` loop
     - [ ] Write Tests: Ensure the pipeline uses the new parallel downloader for episodes.
     - [ ] Implement: Replace the mock/placeholder download logic in `processEpisode`.
