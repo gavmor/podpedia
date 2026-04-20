@@ -1,12 +1,39 @@
 package types
 
-// Episode represents the raw data ingested from the RSS feed
+import "encoding/xml"
+
+// Podcast represents the high-level metadata of a podcast feed
+type Podcast struct {
+	Title       string `xml:"title"`
+	Description string `xml:"description"`
+	URL         string
+}
+
+// Episode represents an individual podcast episode from the RSS feed
 type Episode struct {
-	ID           string
-	Title        string
-	AudioURL     string
-	Description  string
-	Transcript   string
+	ID          string `xml:"guid"`
+	Title       string `xml:"title"`
+	AudioURL    string `xml:"-"`
+	PubDate     string `xml:"pubDate"`
+	Description string `xml:"description"`
+	Transcript  string `xml:"-"` // Not in RSS
+}
+
+func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	type Alias Episode
+	aux := &struct {
+		Enclosure struct {
+			URL string `xml:"url,attr"`
+		} `xml:"enclosure"`
+		*Alias
+	}{
+		Alias: (*Alias)(e),
+	}
+	if err := d.DecodeElement(aux, &start); err != nil {
+		return err
+	}
+	e.AudioURL = aux.Enclosure.URL
+	return nil
 }
 
 // Guest represents an individual extracted by the LLM
