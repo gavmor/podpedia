@@ -17,5 +17,5 @@
 - [x] Task: Integrate with main pipeline \`Run\` loop 503b8e4
     - [x] Write Tests: Ensure the pipeline uses the new parallel downloader for episodes. 503b8e4
     - [x] Implement: Replace the mock/placeholder download logic in \`processEpisode\`. 503b8e4
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Reassembly & Pipeline Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Reassembly & Pipeline Integration' (Protocol in workflow.md) [checkpoint: 09e5982]
 
