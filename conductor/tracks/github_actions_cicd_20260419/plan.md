@@ -11,10 +11,10 @@
 
 
 ## Phase 2: GoReleaser & CD Pipeline
-- [x] Task: Configure GoReleaser ffec0c4
+- [x] Task: Configure GoReleaser ffec0c4 216ed90
     - [x] Write: Create \`.goreleaser.yaml\` to define the build for Linux (amd64). ffec0c4
     - [x] Verify: Run \`goreleaser build --snapshot --clean\` locally to verify the build process. ffec0c4
-- [ ] Task: Create `.github/workflows/release.yml` for automated distribution
-    - [ ] Write: Define the workflow to run GoReleaser on pushes to `main`.
-    - [ ] Verify: Ensure the workflow triggers correctly and handles authentication (GITHUB_TOKEN).
+- [x] Task: Create \`.github/workflows/release.yml\` for automated distribution fe479c6
+    - [x] Write: Define the workflow to run GoReleaser on pushes to \`main\`. fe479c6
+    - [x] Verify: Ensure the workflow triggers correctly and handles authentication (GITHUB_TOKEN). fe479c6
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: GoReleaser & CD Pipeline' (Protocol in workflow.md)
