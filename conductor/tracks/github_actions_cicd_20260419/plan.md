@@ -11,9 +11,9 @@
 
 
 ## Phase 2: GoReleaser & CD Pipeline
-- [ ] Task: Configure GoReleaser
-    - [ ] Write: Create `.goreleaser.yaml` to define the build for Linux (amd64).
-    - [ ] Verify: Run `goreleaser build --snapshot --clean` locally to verify the build process.
+- [~] Task: Configure GoReleaser
+    - [ ] Write: Create \`.goreleaser.yaml\` to define the build for Linux (amd64).
+    - [ ] Verify: Run \`goreleaser build --snapshot --clean\` locally to verify the build process.
 - [ ] Task: Create `.github/workflows/release.yml` for automated distribution
     - [ ] Write: Define the workflow to run GoReleaser on pushes to `main`.
     - [ ] Verify: Ensure the workflow triggers correctly and handles authentication (GITHUB_TOKEN).
