@@ -11,16 +11,16 @@ Implement a high-performance audio downloader that utilizes HTTP Range headers t
 - **Clean Merging:** Seamlessly concatenate in-memory buffers into a final audio file on disk.
 
 ## Technical Approach
-- Use `net/http` with custom `Range` headers.
-- Utilize Go channels and `sync.WaitGroup` to orchestrate parallel segment downloads.
-- Manage memory buffers carefully to handle large audio files (typically 50MB - 200MB).
-- Integrate with the existing `internal/pipeline` to replace the mock/sequential download placeholder.
+- Integrate **\`github.com/cavaliergopher/grab/v3\`** for robust concurrent audio acquisition.
+- Leverage the library's built-in support for \`Range\` headers, chunk merging, and CDN quirk handling.
+- Integrate with the existing \`internal/pipeline\` to replace the mock/sequential download placeholder.
 
 ## Acceptance Criteria
 - Successfully downloads 100MB+ audio files significantly faster than sequential methods.
-- The resulting merged file is bit-for-bit identical to a sequential download.
-- Handles server errors (e.g., servers that don't support Range headers) by falling back to sequential download.
+- The resulting merged file is valid and playable (verified via basic file check).
+- Successfully integrates the external FOSS library into the pipeline.
 - No progress UI (None).
+
 
 ## Out of Scope
 - Visual progress bars.

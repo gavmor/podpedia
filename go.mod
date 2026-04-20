@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/alitto/pond v1.9.2
-	github.com/melbahja/got v0.7.0
+	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/spf13/cobra v1.10.2
 )
