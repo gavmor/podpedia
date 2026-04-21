@@ -9,26 +9,31 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/gavmor/wasm-microkernel/guest-bindings/plugin_world"
+	pluginworld "github.com/gavmor/podpedia/gen/podpedia/kernel/plugin-world"
+	"go.bytecodealliance.org/cm"
 )
 
 func main() {}
 
-func init() { plugin_world.SetExportsPluginWorld(&RSSPlugin{}) }
+// Result is a convenience alias used throughout this file.
+type Result = cm.Result[string, string, string]
 
-type RSSPlugin struct{}
+func ok(s string) Result  { return cm.OK[Result](s) }
+func fail(s string) Result { return cm.Err[Result](s) }
 
-func (r *RSSPlugin) Execute(reqJSON string) (plugin_world.Result[string, string], error) {
-	var req struct {
-		XML string `json:"xml"`
+func init() {
+	pluginworld.Exports.Execute = func(reqJSON string) Result {
+		var req struct {
+			XML string `json:"xml"`
+		}
+		if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
+			return fail("bad request: " + err.Error())
+		}
+		p, eps, err := parseRSS(req.XML)
+		if err != nil {
+			return fail("rss parse: " + err.Error())
+		}
+		out, _ := json.Marshal(map[string]any{"podcast": p, "episodes": eps})
+		return ok(string(out))
 	}
-	if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
-		return plugin_world.Err[string, string]("bad request: " + err.Error()), nil
-	}
-	p, eps, err := parseRSS(req.XML)
-	if err != nil {
-		return plugin_world.Err[string, string]("rss parse: " + err.Error()), nil
-	}
-	out, _ := json.Marshal(map[string]any{"podcast": p, "episodes": eps})
-	return plugin_world.Ok[string, string](string(out)), nil
 }

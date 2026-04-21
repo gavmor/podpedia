@@ -6,7 +6,6 @@ require (
 	code.cloudfoundry.org/lager/v3 v3.1.0
 	github.com/alitto/pond v1.9.2
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/gavmor/wasm-microkernel v0.5.2
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/onsi/ginkgo/v2 v2.22.1
 	github.com/onsi/gomega v1.36.1
@@ -17,7 +16,6 @@ require (
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/eliben/watgo v0.4.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect

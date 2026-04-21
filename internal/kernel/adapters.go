@@ -10,6 +10,7 @@ import (
 
 // Each adapter implements one of the pipeline's consumer-driven interfaces
 // by delegating to a named WASM plugin via Kernel.Call. pipeline.go is unchanged.
+// The kernel now returns raw OK bytes directly — no JSON envelope to unwrap.
 
 // ── Transcriber ───────────────────────────────────────────────────────────────
 
@@ -22,12 +23,8 @@ func (t *WasmTranscriber) Transcribe(audioURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	payload, err := unwrapResult(raw)
-	if err != nil {
-		return "", err
-	}
 	var resp protocol.TranscribeResponse
-	if err := json.Unmarshal(payload, &resp); err != nil {
+	if err := json.Unmarshal(raw, &resp); err != nil {
 		return "", fmt.Errorf("transcriber response: %w", err)
 	}
 	return resp.Transcript, nil
@@ -44,35 +41,11 @@ func (e *WasmExtractor) ExtractEntities(ep types.Episode) (types.EncyclopediaEnt
 	if err != nil {
 		return types.EncyclopediaEntry{}, err
 	}
-	payload, err := unwrapResult(raw)
-	if err != nil {
-		return types.EncyclopediaEntry{}, err
-	}
 	var resp protocol.ExtractResponse
-	if err := json.Unmarshal(payload, &resp); err != nil {
+	if err := json.Unmarshal(raw, &resp); err != nil {
 		return types.EncyclopediaEntry{}, fmt.Errorf("extractor response: %w", err)
 	}
 	return resp.Entry, nil
-}
-
-// unwrapResult decodes the {"ok":"..."} / {"err":"..."} wire envelope written
-// by guest-bindings/plugin_world. If neither key is present it returns raw
-// unchanged so callers are backwards-compatible with old plugins.
-func unwrapResult(raw []byte) ([]byte, error) {
-	var wire struct {
-		Ok  *string `json:"ok"`
-		Err *string `json:"err"`
-	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
-		return raw, nil
-	}
-	if wire.Err != nil {
-		return nil, fmt.Errorf("plugin error: %s", *wire.Err)
-	}
-	if wire.Ok != nil {
-		return []byte(*wire.Ok), nil
-	}
-	return raw, nil
 }
 
 // ── AudioDownloader ───────────────────────────────────────────────────────────
