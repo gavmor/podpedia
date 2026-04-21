@@ -17,6 +17,7 @@ var (
 	pluginDir     string
 	ollamaURL     string
 	transcribeURL string
+	episodeLimit  int
 )
 
 var runCmd = &cobra.Command{
@@ -62,6 +63,10 @@ Each stage is a sandboxed WASM plugin loaded from --plugins.`,
 			kernel.NewStore(k),
 		)
 
+		if episodeLimit > 0 {
+			p.WithLimit(episodeLimit)
+		}
+
 		if err := p.Run(rssURL, outputDir); err != nil {
 			logger.Error("pipeline-failed", err)
 			os.Exit(1)
@@ -75,6 +80,7 @@ func init() {
 	runCmd.Flags().StringVarP(&pluginDir, "plugins", "p", "dist/plugins", "Directory containing compiled .wasm plugins")
 	runCmd.Flags().StringVar(&ollamaURL, "ollama", "http://localhost:11434", "Ollama base URL for LLM inference")
 	runCmd.Flags().StringVar(&transcribeURL, "transcribe-url", "", "ASR endpoint URL for transcription (Whisper.cpp, Deepgram, etc.)")
+	runCmd.Flags().IntVarP(&episodeLimit, "limit", "n", 0, "Maximum number of episodes to process (0 = all)")
 	if err := runCmd.MarkFlagRequired("url"); err != nil {
 		panic(err)
 	}

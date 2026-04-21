@@ -31,12 +31,13 @@ type Store interface {
 }
 
 type Pipeline struct {
-	logger       lager.Logger
-	transcriber  Transcriber
-	extractor    Extractor
-	downloader   AudioDownloader
-	store        Store
-	maxWorkers   int
+	logger      lager.Logger
+	transcriber Transcriber
+	extractor   Extractor
+	downloader  AudioDownloader
+	store       Store
+	maxWorkers  int
+	limit       int
 }
 
 func NewPipeline(
@@ -47,13 +48,18 @@ func NewPipeline(
 	store Store,
 ) *Pipeline {
 	return &Pipeline{
-		logger:      logger,
+		logger:     logger,
 		transcriber: transcriber,
-		extractor:   extractor,
-		downloader:  downloader,
-		store:       store,
-		maxWorkers:  runtime.NumCPU(),
+		extractor:  extractor,
+		downloader: downloader,
+		store:      store,
+		maxWorkers: runtime.NumCPU(),
 	}
+}
+
+func (p *Pipeline) WithLimit(n int) *Pipeline {
+	p.limit = n
+	return p
 }
 
 func (p *Pipeline) Run(rssURL string, outputDir string) error {
@@ -63,6 +69,11 @@ func (p *Pipeline) Run(rssURL string, outputDir string) error {
 	if err != nil {
 		p.logger.Error("failed-parsing-feed", err)
 		return fmt.Errorf("failed to fetch RSS feed: %w", err)
+	}
+
+	if p.limit > 0 && len(episodes) > p.limit {
+		p.logger.Info("applying-limit", lager.Data{"total": len(episodes), "limit": p.limit})
+		episodes = episodes[:p.limit]
 	}
 
 	p.logger.Info("found-episodes", lager.Data{"count": len(episodes)})
@@ -108,16 +119,19 @@ func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
 		ep.Transcript = transcript
 	}
 
+	// Save raw data before extraction so we always capture what we have
+	if err := p.store.SaveRawData(outputDir, ep); err != nil {
+		lsess.Error("failed-save-raw", err)
+	}
+
 	lsess.Info("extracting-entities")
 	entry, err := p.extractor.ExtractEntities(ep)
 	if err != nil {
 		lsess.Error("failed-extraction", err)
-		return
+		// Save a minimal entry so callers know the episode was processed
+		entry = types.EncyclopediaEntry{EpisodeID: ep.ID}
 	}
 
-	if err := p.store.SaveRawData(outputDir, ep); err != nil {
-		lsess.Error("failed-save-raw", err)
-	}
 	if err := p.store.SaveStructuredData(outputDir, entry); err != nil {
 		lsess.Error("failed-save-structured", err)
 	}
@@ -194,4 +208,3 @@ func ParseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 
 	return podcast, episodes, nil
 }
-
