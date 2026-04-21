@@ -8,7 +8,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/gavmor/wasm-microkernel/guest-bindings/plugin_world"
 	host "github.com/gavmor/wasm-microkernel/guest-bindings/podpedia/kernel/host_capabilities"
@@ -29,13 +28,8 @@ func (d *DownloaderPlugin) Execute(reqJSON string) (plugin_world.Result[string, 
 		return plugin_world.Err[string, string]("bad request: " + err.Error()), nil
 	}
 
-	switch {
-	case req.URL == "":
-		return plugin_world.Err[string, string]("url required"), nil
-	case req.Dest == "":
-		return plugin_world.Err[string, string]("dest required"), nil
-	case !strings.HasPrefix(req.URL, "http"):
-		return plugin_world.Err[string, string]("url must be http(s)"), nil
+	if err := validateDownloadRequest(req.URL, req.Dest); err != nil {
+		return plugin_world.Err[string, string](err.Error()), nil
 	}
 
 	host.LogMsg("downloading " + req.URL)

@@ -8,7 +8,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/gavmor/wasm-microkernel/guest-bindings/plugin_world"
 	host "github.com/gavmor/wasm-microkernel/guest-bindings/podpedia/kernel/host_capabilities"
@@ -43,17 +42,10 @@ func (t *TranscriberPlugin) Execute(reqJSON string) (plugin_world.Result[string,
 
 	host.LogMsg("transcribing " + target)
 
-	reqBody, _ := json.Marshal(map[string]string{"audio_url": target})
-	rawRes, err := host.HttpPost(req.TranscribeURL, string(reqBody))
+	rawRes, err := host.HttpPost(req.TranscribeURL, buildTranscribeBody(target))
 	if err != nil {
 		return plugin_world.Err[string, string]("host http-post failed: " + err.Error()), nil
 	}
 
-	var resp struct {
-		Transcript string `json:"transcript"`
-	}
-	if err := json.Unmarshal([]byte(rawRes), &resp); err != nil {
-		return plugin_world.Ok[string, string](fmt.Sprintf(`{"transcript":%q}`, rawRes)), nil
-	}
-	return plugin_world.Ok[string, string](fmt.Sprintf(`{"transcript":%q}`, resp.Transcript)), nil
+	return plugin_world.Ok[string, string](formatTranscriptResult(parseASRResponse(rawRes))), nil
 }

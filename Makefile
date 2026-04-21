@@ -3,7 +3,7 @@ DIST    := dist/plugins
 GO      := go
 WASM_FLAGS := -buildmode=c-shared
 
-.PHONY: all plugins clean test ci $(PLUGINS)
+.PHONY: all plugins clean test test-plugins ci $(PLUGINS)
 
 all: plugins
 
@@ -21,9 +21,16 @@ $(PLUGINS):
 test:
 	$(GO) test ./internal/...
 
+## Run unit tests for all plugin logic (no WASM build needed)
+test-plugins:
+	@for p in $(PLUGINS); do \
+		echo "[test] plugin: $$p"; \
+		cd plugins/$$p && $(GO) test -v ./... && cd ../..; \
+	done
+
 ## Remove compiled plugins
 clean:
 	rm -rf $(DIST)
 
-## Full CI: build all plugins then run tests
-ci: plugins test
+## Full CI: build all plugins then run all tests
+ci: plugins test test-plugins

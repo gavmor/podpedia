@@ -9,7 +9,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/gavmor/wasm-microkernel/guest-bindings/plugin_world"
 	host "github.com/gavmor/wasm-microkernel/guest-bindings/podpedia/kernel/host_capabilities"
@@ -78,15 +77,4 @@ func handleStructured(in []byte) (plugin_world.Result[string, string], error) {
 	}
 	host.LogMsg("stored entry: " + path)
 	return plugin_world.Ok[string, string](fmt.Sprintf(`{"path":%q}`, path)), nil
-}
-
-func slug(s string) string {
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-':
-			return r
-		default:
-			return '_'
-		}
-	}, s)
 }
