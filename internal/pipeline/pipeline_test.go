@@ -20,7 +20,7 @@ import (
 type mockTranscriber struct{}
 
 func (m *mockTranscriber) Transcribe(audioURL string) (string, error) {
-	return "mock transcript", nil
+	return GoTimeTranscriptFixture, nil
 }
 
 type mockExtractor struct{}
