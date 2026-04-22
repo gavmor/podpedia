@@ -1,0 +1,115 @@
+package pipeline_test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"code.cloudfoundry.org/lager/v3/lagertest"
+	"github.com/gavmor/podpedia/internal/kernel"
+	"github.com/gavmor/podpedia/internal/pipeline"
+	"github.com/gavmor/podpedia/internal/types"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+var _ = Describe("Ollama Integration", func() {
+	var (
+		k         *kernel.Kernel
+		p         *pipeline.Pipeline
+		logger    *lagertest.TestLogger
+		outputDir string
+		ctx       context.Context
+	)
+
+	BeforeEach(func() {
+		// Skip if OLLAMA_URL is not set or if we are in a restricted environment
+		if os.Getenv("OLLAMA_URL") == "" && os.Getenv("CI") != "" {
+			Skip("OLLAMA_URL not set and running in CI")
+		}
+
+		ollamaURL := os.Getenv("OLLAMA_URL")
+		if ollamaURL == "" {
+			ollamaURL = "http://localhost:11434"
+		}
+
+		ctx = context.Background()
+		logger = lagertest.NewTestLogger("integration-test")
+		outputDir = "test_integration_output"
+
+		// Use a more capable model for integration tests
+		model := "qwen3.5:latest"
+
+		var err error
+		k, err = kernel.New(ctx, logger, ollamaURL, model, "")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Map output path for WASI
+		absOutput, _ := filepath.Abs(outputDir)
+		_ = os.MkdirAll(absOutput, 0755)
+		k.SetOutputDir(absOutput)
+
+		// Load real plugins from dist
+		plugins := []string{"rss", "downloader", "transcriber", "extractor", "store"}
+		for _, name := range plugins {
+			path := fmt.Sprintf("../../dist/plugins/%s.wasm", name)
+			err := k.Load(name, path)
+			if err != nil {
+				Skip(fmt.Sprintf("WASM plugins not found at %s. Run 'make plugins' first.", path))
+			}
+		}
+
+		p = pipeline.NewPipeline(
+			logger,
+			kernel.NewTranscriber(k),
+			kernel.NewExtractor(k),
+			kernel.NewDownloader(k),
+			kernel.NewStore(k),
+		)
+	})
+
+	AfterEach(func() {
+		if k != nil {
+			k.Close()
+		}
+		_ = os.RemoveAll(outputDir)
+	})
+
+	It("successfully extracts entities from the Go Time fixture using Ollama", func() {
+		ep := types.Episode{
+			ID:         "integration-test-ep",
+			Title:      "Systems Programming in Go",
+			Transcript: GoTimeTranscriptFixture,
+		}
+
+		// Save the transcript fixture to skip transcription stage and provide input
+		_ = os.MkdirAll(outputDir, 0755)
+		transcriptPath := filepath.Join(outputDir, "integration_test_ep_raw.txt")
+		err := os.WriteFile(transcriptPath, []byte(GoTimeTranscriptFixture), 0644)
+		Expect(err).NotTo(HaveOccurred())
+
+		// We run processEpisode directly to test the extraction logic
+		// Use a simple custom scheme
+		scheme := []byte(`{"guest_name": "", "company": ""}`)
+		p.WithScheme(scheme, "integration")
+
+		// Capture stdout to see plugin logs if any
+		err = p.Run("dummy", outputDir) // Run will fail because dummy isn't a URL, but we just want to test if k.Call works
+		// Actually, let's just call the extractor directly via the kernel adapter
+		
+		extractor := kernel.NewExtractor(k)
+		res, err := extractor.ExtractEntities(ep, scheme)
+		Expect(err).NotTo(HaveOccurred())
+
+		var result map[string]any
+		err = json.Unmarshal(res, &result)
+		Expect(err).NotTo(HaveOccurred())
+
+		fmt.Printf("\n--- Ollama Integration Result ---\n%s\n--------------------------------\n", string(res))
+
+		Expect(result["guest_name"]).To(ContainSubstring("Alice"))
+		Expect(result["company"]).To(ContainSubstring("Acme"))
+	})
+})
