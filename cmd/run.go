@@ -34,6 +34,11 @@ Each stage is a sandboxed WASM plugin loaded from --plugins.`,
 			return
 		}
 
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			fmt.Printf("Error: failed to create or access output directory %q: %v\n", outputDir, err)
+			os.Exit(1)
+		}
+
 		logger := lager.NewLogger("podpedia")
 		logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.INFO))
 
