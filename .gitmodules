@@ -1,3 +1,0 @@
-[submodule "internal/wasm-microkernel"]
-	path = internal/wasm-microkernel
-	url = https://github.com/gavmor/wasm-microkernel.git
