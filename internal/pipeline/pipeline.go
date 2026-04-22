@@ -108,22 +108,34 @@ func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
 	lsess := p.logger.Session("process-episode", lager.Data{"episode": ep.ID})
 	lsess.Info("starting")
 
-	// Download audio if needed
-	audioPath := fmt.Sprintf("%s/%s.mp3", outputDir, slug(ep.ID))
-	if _, err := os.Stat(audioPath); err == nil {
-		lsess.Info("audio-already-exists-skipping-download")
-	} else if os.IsNotExist(err) {
-		lsess.Info("downloading-audio")
-		if err := p.downloader.DownloadAudio(ep.AudioURL, audioPath); err != nil {
-			lsess.Error("failed-download", err)
-			return
+	// Transcribe if needed
+	transcriptPath := fmt.Sprintf("%s/%s_raw.txt", outputDir, slug(ep.ID))
+	if _, err := os.Stat(transcriptPath); err == nil {
+		lsess.Info("transcript-already-exists-loading")
+		content, err := os.ReadFile(transcriptPath)
+		if err == nil {
+			ep.Transcript = string(content)
+		} else {
+			lsess.Error("failed-read-existing-transcript", err)
 		}
-	} else {
-		lsess.Error("failed-stat-audio", err)
-		return
 	}
 
 	if ep.Transcript == "" {
+		// Download audio only if we actually need to transcribe
+		audioPath := fmt.Sprintf("%s/%s.mp3", outputDir, slug(ep.ID))
+		if _, err := os.Stat(audioPath); err == nil {
+			lsess.Info("audio-already-exists-skipping-download")
+		} else if os.IsNotExist(err) {
+			lsess.Info("downloading-audio")
+			if err := p.downloader.DownloadAudio(ep.AudioURL, audioPath); err != nil {
+				lsess.Error("failed-download", err)
+				return
+			}
+		} else {
+			lsess.Error("failed-stat-audio", err)
+			return
+		}
+
 		lsess.Info("transcribing")
 		transcript, err := p.transcriber.Transcribe(ep.AudioURL)
 		if err != nil {
@@ -131,11 +143,11 @@ func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
 			return
 		}
 		ep.Transcript = transcript
-	}
 
-	// Save raw data before extraction so we always capture what we have
-	if err := p.store.SaveRawData(outputDir, ep); err != nil {
-		lsess.Error("failed-save-raw", err)
+		// Save raw data immediately after transcription
+		if err := p.store.SaveRawData(outputDir, ep); err != nil {
+			lsess.Error("failed-save-raw", err)
+		}
 	}
 
 	lsess.Info("extracting-entities")
