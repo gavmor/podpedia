@@ -2,9 +2,11 @@ go 1.26.1
 
 use (
 	.
-	./plugins/rss
 	./plugins/downloader
 	./plugins/extractor
-	./plugins/transcriber
+	./plugins/rss
 	./plugins/store
+	./plugins/transcriber
 )
+
+replace github.com/gavmor/wasm-microkernel => ../wasm-microkernel

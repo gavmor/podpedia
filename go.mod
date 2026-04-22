@@ -6,11 +6,11 @@ require (
 	code.cloudfoundry.org/lager/v3 v3.1.0
 	github.com/alitto/pond v1.9.2
 	github.com/cavaliergopher/grab/v3 v3.0.1
+	github.com/gavmor/wasm-microkernel v0.5.2
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/onsi/ginkgo/v2 v2.22.1
 	github.com/onsi/gomega v1.36.1
 	github.com/spf13/cobra v1.10.2
-	github.com/tetratelabs/wazero v1.11.0
 )
 
 require (
@@ -27,6 +27,8 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/tetratelabs/wazero v1.11.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
