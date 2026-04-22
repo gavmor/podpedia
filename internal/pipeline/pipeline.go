@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"code.cloudfoundry.org/lager/v3"
@@ -18,7 +19,7 @@ type Transcriber interface {
 }
 
 type Extractor interface {
-	ExtractEntities(ep types.Episode) (types.EncyclopediaEntry, error)
+	ExtractEntities(ep types.Episode, scheme []byte) ([]byte, error)
 }
 
 type AudioDownloader interface {
@@ -27,17 +28,19 @@ type AudioDownloader interface {
 
 type Store interface {
 	SaveRawData(outputDir string, ep types.Episode) error
-	SaveStructuredData(outputDir string, entry types.EncyclopediaEntry) error
+	SaveStructuredData(outputDir string, ep types.Episode, entry []byte, schemeID string) error
 }
 
 type Pipeline struct {
-	logger      lager.Logger
-	transcriber Transcriber
-	extractor   Extractor
-	downloader  AudioDownloader
-	store       Store
-	maxWorkers  int
-	limit       int
+	logger       lager.Logger
+	transcriber  Transcriber
+	extractor    Extractor
+	downloader   AudioDownloader
+	store        Store
+	maxWorkers   int
+	limit        int
+	outputScheme []byte
+	schemeID     string
 }
 
 func NewPipeline(
@@ -48,12 +51,12 @@ func NewPipeline(
 	store Store,
 ) *Pipeline {
 	return &Pipeline{
-		logger:     logger,
+		logger:      logger,
 		transcriber: transcriber,
-		extractor:  extractor,
-		downloader: downloader,
-		store:      store,
-		maxWorkers: runtime.NumCPU(),
+		extractor:   extractor,
+		downloader:  downloader,
+		store:       store,
+		maxWorkers:  runtime.NumCPU(),
 	}
 }
 
@@ -62,8 +65,14 @@ func (p *Pipeline) WithLimit(n int) *Pipeline {
 	return p
 }
 
+func (p *Pipeline) WithScheme(scheme []byte, id string) *Pipeline {
+	p.outputScheme = scheme
+	p.schemeID = id
+	return p
+}
+
 func (p *Pipeline) Run(rssURL string, outputDir string) error {
-	p.logger.Info("starting", lager.Data{"feed": rssURL, "output": outputDir})
+	p.logger.Info("starting", lager.Data{"feed": rssURL, "output": outputDir, "scheme": p.schemeID})
 
 	_, episodes, err := ParseRSSWithGofeed(rssURL)
 	if err != nil {
@@ -100,13 +109,18 @@ func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
 	lsess.Info("starting")
 
 	// Download audio if needed
-	audioPath := fmt.Sprintf("%s/%s.mp3", outputDir, ep.ID)
-	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
+	audioPath := fmt.Sprintf("%s/%s.mp3", outputDir, slug(ep.ID))
+	if _, err := os.Stat(audioPath); err == nil {
+		lsess.Info("audio-already-exists-skipping-download")
+	} else if os.IsNotExist(err) {
 		lsess.Info("downloading-audio")
 		if err := p.downloader.DownloadAudio(ep.AudioURL, audioPath); err != nil {
 			lsess.Error("failed-download", err)
 			return
 		}
+	} else {
+		lsess.Error("failed-stat-audio", err)
+		return
 	}
 
 	if ep.Transcript == "" {
@@ -125,19 +139,22 @@ func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
 	}
 
 	lsess.Info("extracting-entities")
-	entry, err := p.extractor.ExtractEntities(ep)
+	entry, err := p.extractor.ExtractEntities(ep, p.outputScheme)
 	if err != nil {
 		lsess.Error("failed-extraction", err)
-		// Save a minimal entry so callers know the episode was processed
-		entry = types.EncyclopediaEntry{EpisodeID: ep.ID}
+		// No reliable generic "minimal" entry for arbitrary schemes
+		return
 	}
 
-	if err := p.store.SaveStructuredData(outputDir, entry); err != nil {
+	if err := p.store.SaveStructuredData(outputDir, ep, entry, p.schemeID); err != nil {
 		lsess.Error("failed-save-structured", err)
 	}
 
+
+
 	lsess.Info("completed")
 }
+
 
 func validateEpisode(ep types.Episode) error {
 	if ep.Title == "" {
@@ -207,4 +224,13 @@ func ParseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 	}
 
 	return podcast, episodes, nil
+}
+
+func slug(s string) string {
+	return strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return '_'
+	}, s)
 }

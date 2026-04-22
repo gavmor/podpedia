@@ -18,11 +18,12 @@ type Kernel struct {
 	plugins       map[string][]byte
 	mu            sync.Mutex
 	ollamaURL     string
+	ollamaModel   string
 	transcribeURL string
 }
 
 // New creates a new wasm-microkernel Engine.
-func New(ctx context.Context, logger lager.Logger, ollamaURL, transcribeURL string) (*Kernel, error) {
+func New(ctx context.Context, logger lager.Logger, ollamaURL, ollamaModel, transcribeURL string) (*Kernel, error) {
 	engine := host.NewEngine()
 	engine.AllowedHosts = []string{"*"} // Allow all hosts for simplicity, as plugins download audio, RSS, etc.
 	engine.AllowedPaths = map[string]string{"/": "/", ".": "."}
@@ -32,9 +33,21 @@ func New(ctx context.Context, logger lager.Logger, ollamaURL, transcribeURL stri
 		engine:        engine,
 		plugins:       make(map[string][]byte),
 		ollamaURL:     ollamaURL,
+		ollamaModel:   ollamaModel,
 		transcribeURL: transcribeURL,
 	}, nil
 }
+
+// SetOutputDir ensures the WASM engine has write access to the output path.
+func (k *Kernel) SetOutputDir(path string) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.engine.AllowedPaths == nil {
+		k.engine.AllowedPaths = make(map[string]string)
+	}
+	k.engine.AllowedPaths[path] = path
+}
+
 
 // Close shuts down the engine.
 func (k *Kernel) Close() error { 

@@ -3,7 +3,11 @@
 // and returns one Response, both encoded as JSON over fat pointers.
 package protocol
 
-import "github.com/gavmor/podpedia/internal/types"
+import (
+	"encoding/json"
+
+	"github.com/gavmor/podpedia/internal/types"
+)
 
 // ── RSS plugin ────────────────────────────────────────────────────────────────
 
@@ -50,12 +54,14 @@ type TranscribeResponse struct {
 // ExtractRequest carries the episode and the Ollama base URL. The plugin
 // builds and sends the LLM request itself; the host only provides http_post.
 type ExtractRequest struct {
-	Episode   types.Episode `json:"episode"`
-	OllamaURL string        `json:"ollama_url"`
+	Episode     types.Episode   `json:"episode"`
+	OllamaURL   string          `json:"ollama_url"`
+	OllamaModel string          `json:"ollama_model,omitempty"`
+	Scheme      json.RawMessage `json:"scheme,omitempty"` // The requested JSON structure/template
 }
 
 type ExtractResponse struct {
-	Entry types.EncyclopediaEntry `json:"entry"`
+	Entry json.RawMessage `json:"entry"` // Flexible JSON output
 }
 
 // ── Store plugin ──────────────────────────────────────────────────────────────
@@ -66,9 +72,12 @@ type StoreRawRequest struct {
 }
 
 type StoreStructuredRequest struct {
-	OutputDir string                  `json:"output_dir"`
-	Entry     types.EncyclopediaEntry `json:"entry"`
+	OutputDir string          `json:"output_dir"`
+	Episode   types.Episode   `json:"episode"`
+	Entry     json.RawMessage `json:"entry"`
+	SchemeID  string          `json:"scheme_id,omitempty"` // Used for filename suffix
 }
+
 
 type StoreResponse struct {
 	Path string `json:"path"`

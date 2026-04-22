@@ -36,16 +36,19 @@ type WasmExtractor struct{ k *Kernel }
 
 func NewExtractor(k *Kernel) *WasmExtractor { return &WasmExtractor{k} }
 
-func (e *WasmExtractor) ExtractEntities(ep types.Episode) (types.EncyclopediaEntry, error) {
-	raw, err := e.k.Call("extractor", protocol.ExtractRequest{Episode: ep, OllamaURL: e.k.ollamaURL})
+func (e *WasmExtractor) ExtractEntities(ep types.Episode, scheme []byte) ([]byte, error) {
+	req := protocol.ExtractRequest{
+		Episode:     ep,
+		OllamaURL:   e.k.ollamaURL,
+		OllamaModel: e.k.ollamaModel,
+		Scheme:      json.RawMessage(scheme),
+	}
+	raw, err := e.k.Call("extractor", req)
 	if err != nil {
-		return types.EncyclopediaEntry{}, err
+		return nil, err
 	}
-	var resp protocol.ExtractResponse
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return types.EncyclopediaEntry{}, fmt.Errorf("extractor response: %w", err)
-	}
-	return resp.Entry, nil
+	// The plugin returns the structured JSON directly, not wrapped in an "entry" key.
+	return raw, nil
 }
 
 // ── AudioDownloader ───────────────────────────────────────────────────────────
@@ -70,7 +73,14 @@ func (s *WasmStore) SaveRawData(outputDir string, ep types.Episode) error {
 	return err
 }
 
-func (s *WasmStore) SaveStructuredData(outputDir string, entry types.EncyclopediaEntry) error {
-	_, err := s.k.Call("store", protocol.StoreStructuredRequest{OutputDir: outputDir, Entry: entry})
+func (s *WasmStore) SaveStructuredData(outputDir string, ep types.Episode, entry []byte, schemeID string) error {
+	req := protocol.StoreStructuredRequest{
+		OutputDir: outputDir,
+		Episode:   ep,
+		Entry:     json.RawMessage(entry),
+		SchemeID:  schemeID,
+	}
+	_, err := s.k.Call("store", req)
 	return err
 }
+

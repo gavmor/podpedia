@@ -1,4 +1,3 @@
-//go:build wasip1
 package main
 
 import (
@@ -7,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gavmor/podpedia/internal/types"
 	"github.com/gavmor/wasm-microkernel/guest"
 	"github.com/samber/lo"
 )
@@ -17,25 +17,20 @@ func init() {
 		if err := json.Unmarshal([]byte(reqJSON), &probe); err != nil {
 			return "", err
 		}
-		switch {
-		case lo.HasKey(probe, "episode"):
-			return handleRaw([]byte(reqJSON))
-		case lo.HasKey(probe, "entry"):
-			return handleStructured([]byte(reqJSON))
-		default:
-			return "", fmt.Errorf("request must contain 'episode' or 'entry'")
+		if _, ok := probe["entry"]; ok {
+			return HandleStructured([]byte(reqJSON))
 		}
+		if _, ok := probe["episode"]; ok {
+			return HandleRaw([]byte(reqJSON))
+		}
+		return "", fmt.Errorf("request must contain 'episode' and optionally 'entry'")
 	})
 }
 
-func handleRaw(in []byte) (string, error) {
+func HandleRaw(in []byte) (string, error) {
 	var req struct {
-		OutputDir string `json:"output_dir"`
-		Episode   struct {
-			ID         string `json:"id"`
-			Title      string `json:"title"`
-			Transcript string `json:"transcript"`
-		} `json:"episode"`
+		OutputDir string        `json:"output_dir"`
+		Episode   types.Episode `json:"episode"`
 	}
 	if err := json.Unmarshal(in, &req); err != nil {
 		return "", err
@@ -53,21 +48,29 @@ func handleRaw(in []byte) (string, error) {
 	return fmt.Sprintf(`{"path":%q}`, path), nil
 }
 
-func handleStructured(in []byte) (string, error) {
+func HandleStructured(in []byte) (string, error) {
 	var req struct {
 		OutputDir string          `json:"output_dir"`
+		Episode   types.Episode   `json:"episode"`
 		Entry     json.RawMessage `json:"entry"`
+		SchemeID  string          `json:"scheme_id"`
 	}
 	if err := json.Unmarshal(in, &req); err != nil {
 		return "", err
 	}
-	var meta struct {
-		EpisodeID string `json:"episode_id"`
-	}
-	_ = json.Unmarshal(req.Entry, &meta)
 
-	path := fmt.Sprintf("%s/%s_entry.json", req.OutputDir, slug(meta.EpisodeID))
-	pretty, _ := json.MarshalIndent(json.RawMessage(req.Entry), "", "  ")
+	suffix := "entry"
+	if req.SchemeID != "" {
+		suffix = req.SchemeID
+	}
+
+	id := req.Episode.ID
+	if id == "" {
+		id = "unknown"
+	}
+
+	path := fmt.Sprintf("%s/%s_%s.json", req.OutputDir, slug(id), suffix)
+	pretty, _ := json.MarshalIndent(req.Entry, "", "  ")
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return "", err
@@ -75,7 +78,7 @@ func handleStructured(in []byte) (string, error) {
 	if err := os.WriteFile(path, pretty, 0644); err != nil {
 		return "", err
 	}
-	guest.LogMsg("stored entry: " + path)
+	guest.LogMsg("stored structured: " + path)
 	return fmt.Sprintf(`{"path":%q}`, path), nil
 }
 

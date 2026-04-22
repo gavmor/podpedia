@@ -6,39 +6,42 @@ import (
 	"strings"
 )
 
-func buildPrompt(title, content string) string {
-	return fmt.Sprintf(`Extract structured data from this podcast episode. Return ONLY valid JSON:
-{"guests":[{"name":"","background":"","ideology":""}],"companies":[{"name":"","business_model":"","customers":""}]}
+func buildPrompt(title, content string, scheme json.RawMessage) string {
+	schemaStr := string(scheme)
+	if schemaStr == "" || schemaStr == "null" {
+		schemaStr = `{"guests":[{"name":"","background":"","ideology":""}],"companies":[{"name":"","business_model":"","customers":""}]}`
+	}
 
-Episode: %s
-Content: %s
-JSON:`, title, content)
+	return fmt.Sprintf(`Extract structured data from this podcast episode into the JSON format provided.
+Return ONLY valid JSON.
+
+Schema/Template:
+%s
+
+Episode Title: %s
+Episode Content: %s
+JSON:`, schemaStr, title, content)
 }
 
-func parseCompletion(episodeID, raw string) (map[string]any, error) {
+func parseCompletion(raw string) (json.RawMessage, error) {
+	raw = stripMarkdown(raw)
 	start := strings.Index(raw, "{")
 	end := strings.LastIndex(raw, "}")
 	if start < 0 || end <= start {
 		return nil, fmt.Errorf("no JSON in completion")
 	}
-	var extracted struct {
-		Guests []struct {
-			Name       string `json:"name"`
-			Background string `json:"background"`
-			Ideology   string `json:"ideology"`
-		} `json:"guests"`
-		Companies []struct {
-			Name          string `json:"name"`
-			BusinessModel string `json:"business_model"`
-			Customers     string `json:"customers"`
-		} `json:"companies"`
+	
+	js := raw[start : end+1]
+	return json.RawMessage(js), nil
+}
+
+func stripMarkdown(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "```") {
+		lines := strings.Split(s, "\n")
+		if len(lines) > 2 {
+			return strings.Join(lines[1:len(lines)-1], "\n")
+		}
 	}
-	if err := json.Unmarshal([]byte(raw[start:end+1]), &extracted); err != nil {
-		return nil, err
-	}
-	return map[string]any{
-		"episode_id": episodeID,
-		"guests":     extracted.Guests,
-		"companies":  extracted.Companies,
-	}, nil
+	return s
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"code.cloudfoundry.org/lager/v3"
 	"github.com/gavmor/podpedia/internal/kernel"
@@ -16,8 +17,10 @@ var (
 	outputDir     string
 	pluginDir     string
 	ollamaURL     string
+	ollamaModel   string
 	transcribeURL string
 	episodeLimit  int
+	outputScheme  string
 )
 
 var runCmd = &cobra.Command{
@@ -34,8 +37,13 @@ Each stage is a sandboxed WASM plugin loaded from --plugins.`,
 			return
 		}
 
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
-			fmt.Printf("Error: failed to create or access output directory %q: %v\n", outputDir, err)
+		absOutput, err := filepath.Abs(outputDir)
+		if err != nil {
+			fmt.Printf("Error: failed to get absolute path for %q: %v\n", outputDir, err)
+			os.Exit(1)
+		}
+		if err := os.MkdirAll(absOutput, 0755); err != nil {
+			fmt.Printf("Error: failed to create or access output directory %q: %v\n", absOutput, err)
 			os.Exit(1)
 		}
 
@@ -44,14 +52,17 @@ Each stage is a sandboxed WASM plugin loaded from --plugins.`,
 
 		ctx := context.Background()
 
-		k, err := kernel.New(ctx, logger, ollamaURL, transcribeURL)
+		k, err := kernel.New(ctx, logger, ollamaURL, ollamaModel, transcribeURL)
 		if err != nil {
 			logger.Error("kernel-init", err)
 			os.Exit(1)
 		}
 		defer k.Close()
 
+		k.SetOutputDir(absOutput)
+
 		plugins := []string{"rss", "downloader", "transcriber", "extractor", "store"}
+
 		for _, name := range plugins {
 			path := fmt.Sprintf("%s/%s.wasm", pluginDir, name)
 			if err := k.Load(name, path); err != nil {
@@ -72,7 +83,20 @@ Each stage is a sandboxed WASM plugin loaded from --plugins.`,
 			p.WithLimit(episodeLimit)
 		}
 
-		if err := p.Run(rssURL, outputDir); err != nil {
+		if outputScheme != "" {
+			schemeBytes, err := os.ReadFile(outputScheme)
+			if err != nil {
+				fmt.Printf("Error: failed to read output scheme file %q: %v\n", outputScheme, err)
+				os.Exit(1)
+			}
+			id := filepath.Base(outputScheme)
+			if ext := filepath.Ext(id); ext != "" {
+				id = id[:len(id)-len(ext)]
+			}
+			p.WithScheme(schemeBytes, id)
+		}
+
+		if err := p.Run(rssURL, absOutput); err != nil {
 			logger.Error("pipeline-failed", err)
 			os.Exit(1)
 		}
@@ -84,8 +108,10 @@ func init() {
 	runCmd.Flags().StringVarP(&outputDir, "output", "o", "output", "Directory to save processed data")
 	runCmd.Flags().StringVarP(&pluginDir, "plugins", "p", "dist/plugins", "Directory containing compiled .wasm plugins")
 	runCmd.Flags().StringVar(&ollamaURL, "ollama", "http://localhost:11434", "Ollama base URL for LLM inference")
+	runCmd.Flags().StringVar(&ollamaModel, "ollama-model", "qwen2.5:0.5b", "Ollama model for LLM inference")
 	runCmd.Flags().StringVar(&transcribeURL, "transcribe-url", "", "ASR endpoint URL for transcription (Whisper.cpp, Deepgram, etc.)")
 	runCmd.Flags().IntVarP(&episodeLimit, "limit", "n", 0, "Maximum number of episodes to process (0 = all)")
+	runCmd.Flags().StringVar(&outputScheme, "output-scheme", "", "Path to a JSON file defining the structured output schema")
 	if err := runCmd.MarkFlagRequired("url"); err != nil {
 		panic(err)
 	}

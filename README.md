@@ -46,11 +46,41 @@ make plugins
 | Flag | Short | Default | Description |
 |---|---|---|---|
 | `--url` | `-u` | *(required)* | Podcast RSS feed URL |
-| `--output` | `-o` | `output` | Directory to write transcripts and entries |
+| `--output` | `-o` | `output` | Directory to save processed data |
 | `--plugins` | `-p` | `dist/plugins` | Directory containing compiled `.wasm` plugins |
 | `--limit` | `-n` | `0` (all) | Maximum number of episodes to process |
 | `--ollama` | | `http://localhost:11434` | Ollama base URL for LLM inference |
+| `--ollama-model` | | `qwen2.5:0.5b` | Ollama model to use for extraction |
+| `--output-scheme` | | *(none)* | Path to a JSON file defining the extraction schema |
 | `--transcribe-url` | | *(none)* | ASR endpoint for transcription (Whisper.cpp, Deepgram, etc.) |
+
+### Configurable Structured Extraction
+
+Podpedia supports arbitrary extraction schemas via the `--output-scheme` flag. Provide a JSON file as a template, and the LLM will be instructed to populate it.
+
+**Example: Ideology Analysis (`ideology.json`)**
+```json
+{
+  "themes": ["List of core topics"],
+  "political_leanings": "Description of leanings",
+  "key_arguments": ["List of primary claims"]
+}
+```
+
+**Example: Market Fit (`market_fit.json`)**
+```json
+{
+  "total_addressable_market": "Estimated size",
+  "pain_points": ["Customer problems identified"],
+  "competitors_mentioned": ["Other companies in the space"],
+  "investment_score": 0.85
+}
+```
+
+Usage:
+```bash
+./podpedia run --url <FEED> --output-scheme ideology.json
+```
 
 ### Examples
 
