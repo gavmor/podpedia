@@ -6,7 +6,7 @@ project_name: podpedia
 
 before:
   hooks:
-    - go mod tidy
+    - make plugins
 
 builds:
   - env:
