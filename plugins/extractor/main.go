@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/gavmor/podpedia/internal/types"
 	"github.com/gavmor/wasm-microkernel/guest"
@@ -35,34 +36,53 @@ func init() {
 			model = "qwen2.5:0.5b"
 		}
 
+		schemaStr := string(req.Scheme)
+		if schemaStr == "" || schemaStr == "null" {
+			schemaStr = `{"guests":[{"name":"","background":"","ideology":""}],"companies":[{"name":"","business_model":"","customers":""}]}`
+		}
+
+		messages := []map[string]string{
+			{
+				"role":    "system",
+				"content": "You are a data extraction assistant. You MUST return ONLY valid JSON. If no information is found for a field, return an empty array or null as appropriate for the schema. Do not hallucinate.",
+			},
+			{
+				"role": "user",
+				"content": fmt.Sprintf("Extract data from this podcast episode.\n\nSchema:\n%s\n\nTitle: %s\nContent: %s",
+					schemaStr, ep.Title, content),
+			},
+		}
+
 		reqBody, _ := json.Marshal(map[string]any{
-			"model":  model,
-			"prompt": buildPrompt(ep.Title, content, req.Scheme),
-			"format": "json",
-			"stream": false,
+			"model":    model,
+			"messages": messages,
+			"format":   "json",
+			"stream":   false,
 			"options": map[string]any{
 				"num_predict": 1000,
 			},
 		})
 
-		rawRes, err := guest.HttpPost(req.OllamaURL+"/api/generate", string(reqBody))
+		rawRes, err := guest.HttpPost(req.OllamaURL+"/api/chat", string(reqBody))
 		if err != nil {
 			return "", err
 		}
 
 		var ollamaResp struct {
-			Response string `json:"response"`
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
 		}
-		completion := ""
-		if err := json.Unmarshal([]byte(rawRes), &ollamaResp); err == nil {
-			completion = ollamaResp.Response
+		if err := json.Unmarshal([]byte(rawRes), &ollamaResp); err != nil {
+			return "", fmt.Errorf("ollama response: %w", err)
 		}
+		completion := ollamaResp.Message.Content
 
 		entry, err := parseCompletion(completion)
-		
+
 		// Create the final response object.
 		response := make(map[string]any)
-		
+
 		if err != nil {
 			guest.LogMsg("parse failed: " + err.Error())
 			response["error"] = err.Error()
