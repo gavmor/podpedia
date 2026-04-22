@@ -7,7 +7,7 @@ An automated pipeline that ingests a podcast RSS feed, processes episodes concur
 - Robust RSS ingestion via `gofeed`
 - Hardware-aware concurrent processing via `alitto/pond`
 - Robust audio downloading via `cavaliergopher/grab`
-- Sandboxed WASM plugin architecture (swap any stage without recompiling the host)
+- Sandboxed WASM plugin architecture — swap any pipeline stage without recompiling the host
 - BDD-style testing with `Ginkgo` and `Gomega`
 - Structured JSON logging with `lager`
 
@@ -108,15 +108,25 @@ Example entry:
 RSS fetch → Download → Transcribe → Extract entities → Store
 ```
 
-Each stage runs as a sandboxed WASM plugin. Transcription is skipped gracefully if `--transcribe-url` is not set. Extraction falls back to an empty entry if Ollama is unavailable.
+Each stage runs as a sandboxed WASM plugin loaded by the host kernel at startup. Transcription is skipped gracefully if `--transcribe-url` is not set. Extraction falls back to an empty entry if Ollama is unavailable.
+
+The host kernel communicates with plugins over a hand-rolled Component Model ABI using wazero (pure Go, no CGO). The plugin guest SDK lives in [`github.com/gavmor/wasm-microkernel`](https://github.com/gavmor/wasm-microkernel); see **Plugin Status** below.
+
+## Plugin Status
+
+> **In progress.** The host kernel and all five plugin logic packages are complete and tested. The guest-side ABI wiring (the glue that connects each plugin's logic to the host's `execute` entry point) is awaiting the `guest/` SDK package in `wasm-microkernel` v0.6.0. Until that is published, `make plugins` produces no-op stub binaries that the host will reject at startup with a clear error:
+>
+> ```
+> plugin rss: missing required export "execute" (guest ABI not wired up)
+> ```
 
 ## Development
 
 ```bash
-# Run host unit tests
+# Run host unit tests (no WASM build required)
 go test ./internal/...
 
-# Run unit tests for all plugin logic
+# Run unit tests for all plugin logic (no WASM build required)
 make test-plugins
 
 # Run both
@@ -124,4 +134,7 @@ make ci
 
 # Rebuild a single plugin
 cd plugins/rss && GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o ../../dist/plugins/rss.wasm .
+
+# Remove compiled plugins
+make clean
 ```
