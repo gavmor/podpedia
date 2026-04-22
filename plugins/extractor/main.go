@@ -25,6 +25,11 @@ func init() {
 
 		content, _ := lo.Coalesce(ep.Transcript, ep.Description)
 
+		// Truncate content to avoid overwhelming tiny models
+		if len(content) > 4000 {
+			content = content[:4000] + "..."
+		}
+
 		model := req.OllamaModel
 		if model == "" {
 			model = "qwen2.5:0.5b"
@@ -35,6 +40,9 @@ func init() {
 			"prompt": buildPrompt(ep.Title, content, req.Scheme),
 			"format": "json",
 			"stream": false,
+			"options": map[string]any{
+				"num_predict": 1000,
+			},
 		})
 
 		rawRes, err := guest.HttpPost(req.OllamaURL+"/api/generate", string(reqBody))
