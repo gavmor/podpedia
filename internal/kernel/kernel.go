@@ -25,6 +25,7 @@ type Kernel struct {
 func New(ctx context.Context, logger lager.Logger, ollamaURL, transcribeURL string) (*Kernel, error) {
 	engine := host.NewEngine()
 	engine.AllowedHosts = []string{"*"} // Allow all hosts for simplicity, as plugins download audio, RSS, etc.
+	engine.AllowedPaths = map[string]string{"/": "/", ".": "."}
 
 	return &Kernel{
 		ctx:           ctx,
