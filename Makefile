@@ -1,11 +1,23 @@
+BINARY_NAME=podpedia
+MAIN_PATH=.
 PLUGINS := rss extractor downloader transcriber store
 DIST    := dist/plugins
 GO      := go
 WASM_FLAGS := -buildmode=c-shared
 
-.PHONY: all plugins clean test test-plugins ci $(PLUGINS)
+.PHONY: all build run plugins clean test test-plugins ci $(PLUGINS)
 
-all: plugins
+all: build plugins
+
+## Build host binary into bin/
+build:
+	@echo "[build] host: $(BINARY_NAME)"
+	@mkdir -p bin
+	$(GO) build -o bin/$(BINARY_NAME) $(MAIN_PATH)
+
+## Run host binary
+run: build
+	./bin/$(BINARY_NAME) run
 
 ## Build all WASM plugins into dist/plugins/
 plugins: $(PLUGINS)
@@ -28,9 +40,9 @@ test-plugins:
 		cd plugins/$$p && $(GO) test -v ./... && cd ../..; \
 	done
 
-## Remove compiled plugins
+## Remove compiled artifacts
 clean:
-	rm -rf $(DIST)
+	rm -rf dist bin
 
-## Full CI: build all plugins then run all tests
-ci: plugins test test-plugins
+## Full CI: build everything then run all tests
+ci: build plugins test test-plugins
