@@ -3,3 +3,5 @@ output/
 test_output/
 /dist/
 /dist/
+go.work
+go.work.sum
