@@ -7,6 +7,6 @@ use (
 	./plugins/rss
 	./plugins/store
 	./plugins/transcriber
+	../third_party/go-ollama-sdk
 )
-
 replace github.com/gavmor/wasm-microkernel => ../wasm-microkernel

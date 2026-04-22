@@ -3,11 +3,42 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 
 	"github.com/gavmor/podpedia/internal/types"
 	"github.com/gavmor/wasm-microkernel/guest"
+	"github.com/rozoomcool/go-ollama-sdk"
 	"github.com/samber/lo"
 )
+
+// extismRoundTripper maps standard http.Client calls to guest.HttpPost
+type extismRoundTripper struct{}
+
+func (e *extismRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Method != http.MethodPost {
+		return nil, fmt.Errorf("extismRoundTripper: only POST is supported")
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer req.Body.Close()
+
+	rawRes, err := guest.HttpPost(req.URL.String(), string(body))
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &http.Response{
+		StatusCode: 200,
+		Body:       io.NopCloser(strings.NewReader(rawRes)),
+		Header:     make(http.Header),
+	}
+	return resp, nil
+}
 
 func init() {
 	guest.Register(func(reqJSON string) (string, error) {
@@ -25,8 +56,6 @@ func init() {
 		guest.LogMsg("extracting: " + ep.Title)
 
 		content, _ := lo.Coalesce(ep.Transcript, ep.Description)
-
-		// Truncate content to avoid overwhelming tiny models
 		if len(content) > 4000 {
 			content = content[:4000] + "..."
 		}
@@ -41,42 +70,26 @@ func init() {
 			schemaStr = `{"guests":[{"name":"","background":"","ideology":""}],"companies":[{"name":"","business_model":"","customers":""}]}`
 		}
 
-		messages := []map[string]string{
-			{
-				"role":    "system",
-				"content": "You are a data extraction assistant. You MUST return ONLY valid JSON. If no information is found for a field, return an empty array or null as appropriate for the schema. Do not hallucinate.",
-			},
-			{
-				"role": "user",
-				"content": fmt.Sprintf("Extract data from this podcast episode.\n\nSchema:\n%s\n\nTitle: %s\nContent: %s",
-					schemaStr, ep.Title, content),
-			},
-		}
-
-		reqBody, _ := json.Marshal(map[string]any{
-			"model":    model,
-			"messages": messages,
-			"format":   "json",
-			"stream":   false,
-			"options": map[string]any{
-				"num_predict": 1000,
-			},
+		client := ollama.NewClient(req.OllamaURL)
+		client.SetHTTPClient(&http.Client{
+			Transport: &extismRoundTripper{},
 		})
 
-		rawRes, err := guest.HttpPost(req.OllamaURL+"/api/chat", string(reqBody))
-		if err != nil {
-			return "", err
+		messages := []ollama.ChatMessage{
+			{
+				Role:    "system",
+				Content: "You are a data extraction assistant. You MUST return ONLY valid JSON. If no information is found for a field, return an empty array or null as appropriate for the schema. Do not hallucinate.",
+			},
+			{
+				Role:    "user",
+				Content: fmt.Sprintf("Extract data from this podcast episode.\n\nSchema:\n%s\n\nTitle: %s\nContent: %s", schemaStr, ep.Title, content),
+			},
 		}
 
-		var ollamaResp struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
+		completion, err := client.Chat(model, messages)
+		if err != nil {
+			return "", fmt.Errorf("ollama sdk chat: %w", err)
 		}
-		if err := json.Unmarshal([]byte(rawRes), &ollamaResp); err != nil {
-			return "", fmt.Errorf("ollama response: %w", err)
-		}
-		completion := ollamaResp.Message.Content
 
 		entry, err := parseCompletion(completion)
 
@@ -88,14 +101,12 @@ func init() {
 			response["error"] = err.Error()
 			response["raw_completion"] = completion
 		} else {
-			// If it's an object, merge its keys.
 			var extracted map[string]any
 			if err := json.Unmarshal(entry, &extracted); err == nil && extracted != nil {
 				for k, v := range extracted {
 					response[k] = v
 				}
 			} else {
-				// If it's not an object (e.g. array), put it in a 'data' field.
 				var data any
 				_ = json.Unmarshal(entry, &data)
 				response["data"] = data
