@@ -6,12 +6,12 @@ module github.com/gavmor/podpedia/plugins/transcriber
 go 1.26.1
 
 require (
-	github.com/gavmor/wasm-microkernel v0.5.2
+	github.com/gavmor/wasm-microkernel v0.8.0
 	github.com/samber/lo v1.53.0
 )
 
 require (
-	github.com/bytecodealliance/wasm-tools-go v0.3.2 // indirect
+	github.com/extism/go-pdk v1.1.3 // indirect
 	golang.org/x/text v0.22.0 // indirect
 )
 

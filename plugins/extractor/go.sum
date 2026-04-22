@@ -1,9 +1,9 @@
-github.com/bytecodealliance/wasm-tools-go v0.3.2 h1:LKni9PS8yCG5/A79L8tcTKthgf7WN5RZD83W1m6wEE0=
-github.com/bytecodealliance/wasm-tools-go v0.3.2/go.mod h1:fdysX1+SiPxcIhdpg8TLhoxz23k28/5cQ0/L9J4mgig=
+github.com/extism/go-pdk v1.1.3 h1:hfViMPWrqjN6u67cIYRALZTZLk/enSPpNKa+rZ9X2SQ=
+github.com/extism/go-pdk v1.1.3/go.mod h1:Gz+LIU/YCKnKXhgge8yo5Yu1F/lbv7KtKFkiCSzW/P4=
 github.com/gavmor/podpedia v0.2.2 h1:trlmh1HnAUP3guTG0icc3Pk+8IdIh0dkwm408LOHeXs=
 github.com/gavmor/podpedia v0.2.2/go.mod h1:ksWrXmBEwZUptty6VqbtdoFB1LdZIFXWRQIVg7dbukU=
-github.com/gavmor/wasm-microkernel v0.5.2 h1:gD/XZo2xfVHTYhTI4h57aWkdgwtzWj4wmfBj0mPmvbc=
-github.com/gavmor/wasm-microkernel v0.5.2/go.mod h1:Iw3V9FrN/HVqTP8LqtdVEj3yPZNFu/DdS89hF7Xt2aM=
+github.com/gavmor/wasm-microkernel v0.8.0 h1:1roSG2ajjGJGAe6di+YbSEM6XIXNSmxFuFsDhKh8E9A=
+github.com/gavmor/wasm-microkernel v0.8.0/go.mod h1:DeWZQvzFCJ9OfnQFcTzCWzE/4cpwszyVT3q2JJxC0pc=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=
