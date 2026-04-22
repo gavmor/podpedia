@@ -1,6 +1,2 @@
-github.com/bytecodealliance/wasm-tools-go v0.3.2 h1:LKni9PS8yCG5/A79L8tcTKthgf7WN5RZD83W1m6wEE0=
-github.com/bytecodealliance/wasm-tools-go v0.3.2/go.mod h1:fdysX1+SiPxcIhdpg8TLhoxz23k28/5cQ0/L9J4mgig=
 github.com/extism/go-pdk v1.1.3 h1:hfViMPWrqjN6u67cIYRALZTZLk/enSPpNKa+rZ9X2SQ=
 github.com/extism/go-pdk v1.1.3/go.mod h1:Gz+LIU/YCKnKXhgge8yo5Yu1F/lbv7KtKFkiCSzW/P4=
-github.com/gavmor/wasm-microkernel v0.5.2 h1:gD/XZo2xfVHTYhTI4h57aWkdgwtzWj4wmfBj0mPmvbc=
-github.com/gavmor/wasm-microkernel v0.5.2/go.mod h1:Iw3V9FrN/HVqTP8LqtdVEj3yPZNFu/DdS89hF7Xt2aM=

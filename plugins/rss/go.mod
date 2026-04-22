@@ -13,7 +13,7 @@ require (
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/bytecodealliance/wasm-tools-go v0.3.2 // indirect
+	github.com/extism/go-pdk v1.1.3 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mmcdole/goxpp v1.1.1-0.20240225020742-a0c311522b23 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -21,3 +21,7 @@ require (
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 )
+
+replace github.com/gavmor/wasm-microkernel => ../../internal/wasm-microkernel
+
+replace github.com/rozoomcool/go-ollama-sdk => ../../internal/sdk/go-ollama-sdk

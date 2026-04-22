@@ -11,6 +11,10 @@ require (
 )
 
 require (
-	github.com/bytecodealliance/wasm-tools-go v0.3.2 // indirect
+	github.com/extism/go-pdk v1.1.3 // indirect
 	golang.org/x/text v0.22.0 // indirect
 )
+
+replace github.com/gavmor/wasm-microkernel => ../../internal/wasm-microkernel
+
+replace github.com/rozoomcool/go-ollama-sdk => ../../internal/sdk/go-ollama-sdk
