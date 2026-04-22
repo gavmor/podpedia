@@ -8,6 +8,7 @@ go 1.26.1
 require (
 	github.com/gavmor/podpedia v0.2.2
 	github.com/gavmor/wasm-microkernel v0.5.2
+	github.com/rozoomcool/go-ollama-sdk v0.0.0-20250620220025-710cf9a2c767
 	github.com/samber/lo v1.53.0
 )
 
