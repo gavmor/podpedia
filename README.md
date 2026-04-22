@@ -110,15 +110,11 @@ RSS fetch → Download → Transcribe → Extract entities → Store
 
 Each stage runs as a sandboxed WASM plugin loaded by the host kernel at startup. Transcription is skipped gracefully if `--transcribe-url` is not set. Extraction falls back to an empty entry if Ollama is unavailable.
 
-The host kernel communicates with plugins over a hand-rolled Component Model ABI using wazero (pure Go, no CGO). The plugin guest SDK lives in [`github.com/gavmor/wasm-microkernel`](https://github.com/gavmor/wasm-microkernel); see **Plugin Status** below.
+The host kernel communicates with plugins using the [Extism](https://extism.org/) SDK (pure Go, via `wasm-microkernel` v0.7.0). The plugin guest SDK lives in [`github.com/gavmor/wasm-microkernel`](https://github.com/gavmor/wasm-microkernel).
 
-## Plugin Status
+## Plugin Architecture
 
-> **In progress.** The host kernel and all five plugin logic packages are complete and tested. The guest-side ABI wiring (the glue that connects each plugin's logic to the host's `execute` entry point) is awaiting the `guest/` SDK package in `wasm-microkernel` v0.6.0. Until that is published, `make plugins` produces no-op stub binaries that the host will reject at startup with a clear error:
->
-> ```
-> plugin rss: missing required export "execute" (guest ABI not wired up)
-> ```
+All five pipeline stages are fully implemented as WebAssembly plugins compiled for `wasip1`. The `wasm-microkernel` provides a clean `guest.Register(...)` interface for plugins to export their business logic, and a secure `host.Engine` for the host application to run them with fine-grained HTTP access control.
 
 ## Development
 
