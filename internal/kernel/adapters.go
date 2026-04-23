@@ -1,86 +1,148 @@
 package kernel
 
 import (
-	"encoding/json"
-	"fmt"
+	"context"
 
-	"github.com/gavmor/podpedia/internal/protocol"
 	"github.com/gavmor/podpedia/internal/types"
+	"github.com/gavmor/wasm-microkernel/host"
 )
 
-// Each adapter implements one of the pipeline's consumer-driven interfaces
-// by delegating to a named WASM plugin via Kernel.Call. pipeline.go is unchanged.
-// The kernel now returns raw OK bytes directly — no JSON envelope to unwrap.
+// PodpediaKernel is a domain-specific wrapper around the generic host.Kernel.
+// It holds configuration for specific AI services and provides high-level
+// methods for pipeline stages.
+type PodpediaKernel struct {
+	*host.Kernel
+	OllamaURL     string
+	OllamaModel   string
+	TranscribeURL string
+}
 
-// ── Transcriber ───────────────────────────────────────────────────────────────
+func NewPodpediaKernel(ollamaURL, ollamaModel, transcribeURL string) *PodpediaKernel {
+	// Policy: Allow everything for now to ensure stability, can be tightened later.
+	k := host.NewKernel(host.Config{
+		AllowedHosts: []string{"*"},
+		AllowedPaths: map[string]string{"/": "/", ".": "."},
+	})
 
-type WasmTranscriber struct{ k *Kernel }
+	return &PodpediaKernel{
+		Kernel:        k,
+		OllamaURL:     ollamaURL,
+		OllamaModel:   ollamaModel,
+		TranscribeURL: transcribeURL,
+	}
+}
 
-func NewTranscriber(k *Kernel) *WasmTranscriber { return &WasmTranscriber{k} }
+// Transcriber adapter
+type transcriber struct {
+	pk *PodpediaKernel
+}
 
-func (t *WasmTranscriber) Transcribe(audioURL string) (string, error) {
-	raw, err := t.k.Call("transcriber", protocol.TranscribeRequest{AudioURL: audioURL, TranscribeURL: t.k.transcribeURL})
+func NewTranscriber(pk *PodpediaKernel) *transcriber {
+	return &transcriber{pk: pk}
+}
+
+func (t *transcriber) Transcribe(audioURL string) (string, error) {
+	req := struct {
+		AudioURL string `json:"audio_url"`
+	}{
+		AudioURL: audioURL,
+	}
+
+	config := map[string]string{
+		"transcribe-url": t.pk.TranscribeURL,
+	}
+
+	res, err := t.pk.Call(context.Background(), "transcriber", req, config)
 	if err != nil {
 		return "", err
 	}
-	var resp protocol.TranscribeResponse
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return "", fmt.Errorf("transcriber response: %w", err)
-	}
-	return resp.Transcript, nil
+
+	return string(res), nil
 }
 
-// ── Extractor ─────────────────────────────────────────────────────────────────
-
-type WasmExtractor struct{ k *Kernel }
-
-func NewExtractor(k *Kernel) *WasmExtractor { return &WasmExtractor{k} }
-
-func (e *WasmExtractor) ExtractEntities(ep types.Episode, scheme []byte) ([]byte, error) {
-	req := protocol.ExtractRequest{
-		Episode:     ep,
-		OllamaURL:   e.k.ollamaURL,
-		OllamaModel: e.k.ollamaModel,
-		Scheme:      json.RawMessage(scheme),
-	}
-	raw, err := e.k.Call("extractor", req)
-	if err != nil {
-		return nil, err
-	}
-	// The plugin returns the structured JSON directly, not wrapped in an "entry" key.
-	return raw, nil
+// Extractor adapter
+type extractor struct {
+	pk *PodpediaKernel
 }
 
-// ── AudioDownloader ───────────────────────────────────────────────────────────
+func NewExtractor(pk *PodpediaKernel) *extractor {
+	return &extractor{pk: pk}
+}
 
-type WasmDownloader struct{ k *Kernel }
+func (e *extractor) ExtractEntities(ep types.Episode, scheme []byte) ([]byte, error) {
+	req := struct {
+		Episode types.Episode `json:"episode"`
+		Scheme  []byte        `json:"scheme"`
+	}{
+		Episode: ep,
+		Scheme:  scheme,
+	}
 
-func NewDownloader(k *Kernel) *WasmDownloader { return &WasmDownloader{k} }
+	config := map[string]string{
+		"ollama-url":   e.pk.OllamaURL,
+		"ollama-model": e.pk.OllamaModel,
+	}
 
-func (d *WasmDownloader) DownloadAudio(url, dest string) error {
-	_, err := d.k.Call("downloader", protocol.DownloadRequest{URL: url, Dest: dest})
+	return e.pk.Call(context.Background(), "extractor", req, config)
+}
+
+// Downloader adapter
+type downloader struct {
+	pk *PodpediaKernel
+}
+
+func NewDownloader(pk *PodpediaKernel) *downloader {
+	return &downloader{pk: pk}
+}
+
+func (d *downloader) DownloadAudio(url, dest string) error {
+	req := struct {
+		URL  string `json:"url"`
+		Dest string `json:"dest"`
+	}{
+		URL:  url,
+		Dest: dest,
+	}
+
+	_, err := d.pk.Call(context.Background(), "downloader", req, nil)
 	return err
 }
 
-// ── Store ─────────────────────────────────────────────────────────────────────
-
-type WasmStore struct{ k *Kernel }
-
-func NewStore(k *Kernel) *WasmStore { return &WasmStore{k} }
-
-func (s *WasmStore) SaveRawData(outputDir string, ep types.Episode) error {
-	_, err := s.k.Call("store", protocol.StoreRawRequest{OutputDir: outputDir, Episode: ep})
-	return err
+// Store adapter
+type store struct {
+	pk *PodpediaKernel
 }
 
-func (s *WasmStore) SaveStructuredData(outputDir string, ep types.Episode, entry []byte, schemeID string) error {
-	req := protocol.StoreStructuredRequest{
+func NewStore(pk *PodpediaKernel) *store {
+	return &store{pk: pk}
+}
+
+func (s *store) SaveRawData(outputDir string, ep types.Episode) error {
+	req := struct {
+		OutputDir string        `json:"output_dir"`
+		Episode   types.Episode `json:"episode"`
+	}{
 		OutputDir: outputDir,
 		Episode:   ep,
-		Entry:     json.RawMessage(entry),
-		SchemeID:  schemeID,
 	}
-	_, err := s.k.Call("store", req)
+
+	_, err := s.pk.Call(context.Background(), "store", req, nil)
 	return err
 }
 
+func (s *store) SaveStructuredData(outputDir string, ep types.Episode, entry []byte, schemeID string) error {
+	req := struct {
+		OutputDir string        `json:"output_dir"`
+		Episode   types.Episode `json:"episode"`
+		Entry     []byte        `json:"entry"`
+		SchemeID  string        `json:"scheme_id"`
+	}{
+		OutputDir: outputDir,
+		Episode:   ep,
+		Entry:     entry,
+		SchemeID:  schemeID,
+	}
+
+	_, err := s.pk.Call(context.Background(), "store", req, nil)
+	return err
+}

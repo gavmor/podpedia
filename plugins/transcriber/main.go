@@ -5,33 +5,26 @@ import (
 	"fmt"
 
 	"github.com/gavmor/wasm-microkernel/guest"
-	"github.com/samber/lo"
 )
 
 func init() {
 	guest.Register(func(reqJSON string) (string, error) {
 		var req struct {
-			AudioPath     string `json:"audio_path"`
-			AudioURL      string `json:"audio_url"`
-			TranscribeURL string `json:"transcribe_url"`
+			AudioURL string `json:"audio_url"`
 		}
 		if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
 			return "", err
 		}
 
-		target, hasTarget := lo.Coalesce(req.AudioPath, req.AudioURL)
-		if !hasTarget {
-			return "", fmt.Errorf("audio_path or audio_url required")
+		transcribeURL, _ := guest.Config("transcribe-url")
+		if transcribeURL == "" {
+			return "", fmt.Errorf("transcribe-url not configured")
 		}
 
-		if req.TranscribeURL == "" {
-			guest.LogMsg("no transcribe_url configured, skipping: " + target)
-			return `{"transcript":""}`, nil
-		}
+		target := req.AudioURL
+		guest.LogMsg("transcribing: " + target)
 
-		guest.LogMsg("transcribing " + target)
-
-		rawRes, err := guest.HttpPost(req.TranscribeURL, buildTranscribeBody(target))
+		rawRes, err := guest.HttpPost(transcribeURL, buildTranscribeBody(target))
 		if err != nil {
 			return "", fmt.Errorf("host http-post failed: %v", err)
 		}

@@ -43,10 +43,8 @@ func (e *extismRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 func init() {
 	guest.Register(func(reqJSON string) (string, error) {
 		var req struct {
-			Episode     types.Episode   `json:"episode"`
-			OllamaURL   string          `json:"ollama_url"`
-			OllamaModel string          `json:"ollama_model"`
-			Scheme      json.RawMessage `json:"scheme"`
+			Episode types.Episode   `json:"episode"`
+			Scheme  json.RawMessage `json:"scheme"`
 		}
 		if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
 			return "", err
@@ -60,9 +58,14 @@ func init() {
 			content = content[:4000] + "..."
 		}
 
-		model := req.OllamaModel
-		if model == "" {
-			model = "qwen2.5:0.5b"
+		// Retrieve infrastructure config via guest.Config
+		ollamaURL, _ := guest.Config("ollama-url")
+		if ollamaURL == "" {
+			ollamaURL = "http://localhost:11434"
+		}
+		ollamaModel, _ := guest.Config("ollama-model")
+		if ollamaModel == "" {
+			ollamaModel = "qwen2.5:0.5b"
 		}
 
 		schemaStr := string(req.Scheme)
@@ -70,7 +73,7 @@ func init() {
 			schemaStr = `{"guests":[{"name":"","background":"","ideology":""}],"companies":[{"name":"","business_model":"","customers":""}]}`
 		}
 
-		client := ollama.NewClient(req.OllamaURL)
+		client := ollama.NewClient(ollamaURL)
 		client.SetHTTPClient(&http.Client{
 			Transport: &extismRoundTripper{},
 		})
@@ -86,7 +89,7 @@ func init() {
 			},
 		}
 
-		completion, err := client.Chat(model, messages)
+		completion, err := client.Chat(ollamaModel, messages)
 		if err != nil {
 			return "", fmt.Errorf("ollama sdk chat: %w", err)
 		}

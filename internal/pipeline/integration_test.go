@@ -1,7 +1,6 @@
 package pipeline_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,11 +16,10 @@ import (
 
 var _ = Describe("Ollama Integration", func() {
 	var (
-		k         *kernel.Kernel
+		k         *kernel.PodpediaKernel
 		p         *pipeline.Pipeline
 		logger    *lagertest.TestLogger
 		outputDir string
-		ctx       context.Context
 	)
 
 	BeforeEach(func() {
@@ -35,30 +33,23 @@ var _ = Describe("Ollama Integration", func() {
 			ollamaURL = "http://localhost:11434"
 		}
 
-		ctx = context.Background()
 		logger = lagertest.NewTestLogger("integration-test")
 		outputDir = "test_integration_output"
 
 		// Use a more capable model for integration tests
 		model := "qwen3.5:latest"
 
-		var err error
-		k, err = kernel.New(ctx, logger, ollamaURL, model, "")
-		Expect(err).NotTo(HaveOccurred())
-
-		// Map output path for WASI
-		absOutput, _ := filepath.Abs(outputDir)
-		_ = os.MkdirAll(absOutput, 0755)
-		k.SetOutputDir(absOutput)
+		k = kernel.NewPodpediaKernel(ollamaURL, model, "")
 
 		// Load real plugins from dist
 		plugins := []string{"rss", "downloader", "transcriber", "extractor", "store"}
 		for _, name := range plugins {
 			path := fmt.Sprintf("../../dist/plugins/%s.wasm", name)
-			err := k.Load(name, path)
+			wasmBytes, err := os.ReadFile(path)
 			if err != nil {
 				Skip(fmt.Sprintf("WASM plugins not found at %s. Run 'make plugins' first.", path))
 			}
+			k.Load(name, wasmBytes)
 		}
 
 		p = pipeline.NewPipeline(
@@ -99,8 +90,8 @@ var _ = Describe("Ollama Integration", func() {
 		_ = p.Run("dummy", outputDir) // Run will fail because dummy isn't a URL, but we just want to test if k.Call works
 		// Actually, let's just call the extractor directly via the kernel adapter
 		
-		extractor := kernel.NewExtractor(k)
-		res, err := extractor.ExtractEntities(ep, scheme)
+		ext := kernel.NewExtractor(k)
+		res, err := ext.ExtractEntities(ep, scheme)
 		Expect(err).NotTo(HaveOccurred())
 
 		var result map[string]any

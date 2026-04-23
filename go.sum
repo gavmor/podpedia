@@ -16,8 +16,8 @@ github.com/dylibso/observe-sdk/go v0.0.0-20240819160327-2d926c5d788a h1:UwSIFv5g
 github.com/dylibso/observe-sdk/go v0.0.0-20240819160327-2d926c5d788a/go.mod h1:C8DzXehI4zAbrdlbtOByKX6pfivJTBiV9Jjqv56Yd9Q=
 github.com/extism/go-sdk v1.7.1 h1:lWJos6uY+tRFdlIHR+SJjwFDApY7OypS/2nMhiVQ9Sw=
 github.com/extism/go-sdk v1.7.1/go.mod h1:IT+Xdg5AZM9hVtpFUA+uZCJMge/hbvshl8bwzLtFyKA=
-github.com/gavmor/wasm-microkernel v0.9.0 h1:aAs/e3S0Q6NY4huZDnAZejSNVOdr188h8WZwVyY9rOg=
-github.com/gavmor/wasm-microkernel v0.9.0/go.mod h1:DeWZQvzFCJ9OfnQFcTzCWzE/4cpwszyVT3q2JJxC0pc=
+github.com/gavmor/wasm-microkernel v0.10.0 h1:S9c6QSY7Tm58mr88hh21FW5zQAB4VQMwFS3AxaXZ2Ws=
+github.com/gavmor/wasm-microkernel v0.10.0/go.mod h1:DeWZQvzFCJ9OfnQFcTzCWzE/4cpwszyVT3q2JJxC0pc=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=

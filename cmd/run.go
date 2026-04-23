@@ -53,42 +53,35 @@ Each stage is a sandboxed WASM plugin. Uses embedded defaults unless --plugins i
 		logger := lager.NewLogger("podpedia")
 		logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.INFO))
 
-		ctx := context.Background()
-
-		k, err := kernel.New(ctx, logger, ollamaURL, ollamaModel, transcribeURL)
-		if err != nil {
-			logger.Error("kernel-init", err)
-			os.Exit(1)
-		}
+		k := kernel.NewPodpediaKernel(ollamaURL, ollamaModel, transcribeURL)
 		defer func() { _ = k.Close() }()
-
-		k.SetOutputDir(absOutput)
 
 		plugins := []string{"rss", "downloader", "transcriber", "extractor", "store"}
 
 		for _, name := range plugins {
+			var wasmBytes []byte
+			var err error
+
 			// 1. Try to load from provided --plugins directory first
 			if cmd.Flags().Changed("plugins") {
 				path := fmt.Sprintf("%s/%s.wasm", pluginDir, name)
-				if err := k.Load(name, path); err == nil {
-					continue
-				} else {
+				wasmBytes, err = os.ReadFile(path)
+				if err != nil {
 					logger.Info("plugin-load-disk-failed-falling-back", lager.Data{"plugin": name, "path": path, "error": err.Error()})
 				}
 			}
 
-			// 2. Fall back to embedded plugins
-			embedPath := fmt.Sprintf("dist/plugins/%s.wasm", name)
-			wasmBytes, err := DefaultPlugins.ReadFile(embedPath)
-			if err != nil {
-				logger.Error("plugin-load-embedded-failed", err, lager.Data{"plugin": name, "path": embedPath})
-				os.Exit(1)
+			// 2. Fall back to embedded plugins if not loaded from disk
+			if len(wasmBytes) == 0 {
+				embedPath := fmt.Sprintf("dist/plugins/%s.wasm", name)
+				wasmBytes, err = DefaultPlugins.ReadFile(embedPath)
+				if err != nil {
+					logger.Error("plugin-load-embedded-failed", err, lager.Data{"plugin": name, "path": embedPath})
+					os.Exit(1)
+				}
 			}
 
-			if err := k.LoadBytes(name, wasmBytes); err != nil {
-				logger.Error("plugin-load-bytes-failed", err, lager.Data{"plugin": name})
-				os.Exit(1)
-			}
+			k.Load(name, wasmBytes)
 		}
 
 		p := pipeline.NewPipeline(
