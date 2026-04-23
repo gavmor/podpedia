@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
@@ -19,6 +21,8 @@ jobs:
           cache: true
 
       - run: go mod download
+      - name: Build WASM Plugins
+        run: make plugins
       - run: go test -v ./...
 
   lint:
@@ -26,12 +30,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: true
 
+      - name: Build WASM Plugins
+        run: make plugins
       - uses: golangci/golangci-lint-action@v7
         with:
           version: v2.11.4
@@ -43,6 +51,8 @@ jobs:
     continue-on-error: true  # warn only — never blocks the build
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: golang/govulncheck-action@v1
         with:
