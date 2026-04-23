@@ -1,5 +1,3 @@
-//go:build wasip1
-
 package main
 
 import (
@@ -8,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/extism/go-pdk"
 	"github.com/gavmor/wasm-microkernel/guest"
 )
 
@@ -27,16 +24,15 @@ func init() {
 
 		guest.LogMsg("downloading " + req.URL)
 
-		httpReq := pdk.NewHTTPRequest(pdk.MethodGet, req.URL)
-		resp := httpReq.Send()
-		if resp.Status() >= 400 {
-			return "", fmt.Errorf("download failed: HTTP %d", resp.Status())
+		body, err := guest.HttpGet(req.URL)
+		if err != nil {
+			return "", fmt.Errorf("download failed: %v", err)
 		}
 
 		if err := os.MkdirAll(filepath.Dir(req.Dest), 0755); err != nil {
 			return "", fmt.Errorf("mkdir failed: %v", err)
 		}
-		if err := os.WriteFile(req.Dest, resp.Body(), 0644); err != nil {
+		if err := os.WriteFile(req.Dest, []byte(body), 0644); err != nil {
 			return "", fmt.Errorf("write file failed: %v", err)
 		}
 
