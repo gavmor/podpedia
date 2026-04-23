@@ -1,68 +1,46 @@
 package main
 
-import "testing"
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
 
-func TestValidateDownloadRequest_Valid(t *testing.T) {
-	cases := []struct {
-		url  string
-		dest string
-	}{
-		{"http://example.com/ep.mp3", "/tmp/ep.mp3"},
-		{"https://cdn.example.com/audio.mp3", "output/audio.mp3"},
-	}
-	for _, tc := range cases {
-		err := validateDownloadRequest(tc.url, tc.dest)
-		if err != nil {
-			t.Errorf("validateDownloadRequest(%q, %q) returned unexpected error: %v", tc.url, tc.dest, err)
-		}
-	}
-}
+var _ = Describe("Downloader Plugin Logic", func() {
+	Describe("validateDownloadRequest", func() {
+		DescribeTable("valid requests",
+			func(url, dest string) {
+				Expect(validateDownloadRequest(url, dest)).To(Succeed())
+			},
+			Entry("standard http", "http://example.com/ep.mp3", "/tmp/ep.mp3"),
+			Entry("secure https", "https://cdn.example.com/audio.mp3", "output/audio.mp3"),
+		)
 
-func TestValidateDownloadRequest_MissingURL(t *testing.T) {
-	err := validateDownloadRequest("", "/tmp/out.mp3")
-	if err == nil {
-		t.Error("want error for empty url, got nil")
-	}
-	if err.Error() != "url required" {
-		t.Errorf("want error %q, got %q", "url required", err.Error())
-	}
-}
+		Context("with missing fields", func() {
+			It("errors if URL is missing", func() {
+				err := validateDownloadRequest("", "/tmp/out.mp3")
+				Expect(err).To(MatchError("url required"))
+			})
 
-func TestValidateDownloadRequest_MissingDest(t *testing.T) {
-	err := validateDownloadRequest("http://example.com/ep.mp3", "")
-	if err == nil {
-		t.Error("want error for empty dest, got nil")
-	}
-	if err.Error() != "dest required" {
-		t.Errorf("want error %q, got %q", "dest required", err.Error())
-	}
-}
+			It("errors if destination is missing", func() {
+				err := validateDownloadRequest("http://example.com/ep.mp3", "")
+				Expect(err).To(MatchError("dest required"))
+			})
 
-func TestValidateDownloadRequest_NonHTTPUrl(t *testing.T) {
-	cases := []string{
-		"ftp://example.com/ep.mp3",
-		"file:///local/path.mp3",
-		"just-a-filename.mp3",
-		"/absolute/path.mp3",
-	}
-	for _, url := range cases {
-		err := validateDownloadRequest(url, "/tmp/out.mp3")
-		if err == nil {
-			t.Errorf("want error for non-http url %q, got nil", url)
-		}
-		if err.Error() != "url must be http(s)" {
-			t.Errorf("want error %q for url %q, got %q", "url must be http(s)", url, err.Error())
-		}
-	}
-}
+			It("prioritizes URL error over destination error", func() {
+				err := validateDownloadRequest("", "")
+				Expect(err).To(MatchError("url required"))
+			})
+		})
 
-func TestValidateDownloadRequest_URLTakesPriorityOverDest(t *testing.T) {
-	// When url is empty, should error on url before checking dest
-	err := validateDownloadRequest("", "")
-	if err == nil {
-		t.Error("want error, got nil")
-	}
-	if err.Error() != "url required" {
-		t.Errorf("want url error first, got %q", err.Error())
-	}
-}
+		DescribeTable("invalid URL schemes",
+			func(url string) {
+				err := validateDownloadRequest(url, "/tmp/out.mp3")
+				Expect(err).To(MatchError("url must be http(s)"))
+			},
+			Entry("ftp", "ftp://example.com/ep.mp3"),
+			Entry("local file", "file:///local/path.mp3"),
+			Entry("no scheme", "just-a-filename.mp3"),
+			Entry("absolute path", "/absolute/path.mp3"),
+		)
+	})
+})

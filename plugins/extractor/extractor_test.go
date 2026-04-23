@@ -2,75 +2,65 @@ package main
 
 import (
 	"encoding/json"
-	"strings"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestBuildPrompt_ContainsTitleAndContent(t *testing.T) {
-	prompt := buildPrompt("My Episode", "Some transcript content", nil)
-	if !strings.Contains(prompt, "My Episode") {
-		t.Error("prompt must contain episode title")
-	}
-	if !strings.Contains(prompt, "Some transcript content") {
-		t.Error("prompt must contain content")
-	}
-}
+var _ = Describe("Extractor Plugin Logic", func() {
+	Describe("buildPrompt", func() {
+		It("contains the episode title and transcript content", func() {
+			prompt := buildPrompt("My Episode", "Some transcript content", nil)
+			Expect(prompt).To(ContainSubstring("My Episode"))
+			Expect(prompt).To(ContainSubstring("Some transcript content"))
+		})
 
-func TestBuildPrompt_ContainsCustomScheme(t *testing.T) {
-	scheme := json.RawMessage(`{"ideology":""}`)
-	prompt := buildPrompt("Title", "Content", scheme)
-	if !strings.Contains(prompt, `"ideology"`) {
-		t.Error("prompt must include custom scheme")
-	}
-}
+		Context("with a custom scheme", func() {
+			It("includes the custom scheme in the prompt", func() {
+				scheme := json.RawMessage(`{"ideology":""}`)
+				prompt := buildPrompt("Title", "Content", scheme)
+				Expect(prompt).To(ContainSubstring(`"ideology"`))
+			})
+		})
+	})
 
-func TestParseCompletion_ValidJSON(t *testing.T) {
-	raw := `{"guests":[{"name":"Alice","background":"Engineer","ideology":"pragmatic"}],"companies":[{"name":"Acme","business_model":"SaaS","customers":"SMBs"}]}`
-	result, err := parseCompletion(raw)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	var extracted map[string]any
-	if err := json.Unmarshal(result, &extracted); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := extracted["guests"]; !ok {
-		t.Error("missing guests key")
-	}
-}
+	Describe("parseCompletion", func() {
+		Context("with valid JSON completion", func() {
+			It("correctly parses the JSON", func() {
+				raw := `{"guests":[{"name":"Alice","background":"Engineer","ideology":"pragmatic"}],"companies":[{"name":"Acme","business_model":"SaaS","customers":"SMBs"}]}`
+				result, err := parseCompletion(raw)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(MatchJSON(raw))
+			})
+		})
 
-func TestParseCompletion_JSONEmbeddedInPreamble(t *testing.T) {
-	raw := `Here is the extracted data: {"guests":[],"companies":[{"name":"Beta","business_model":"B2B","customers":"enterprises"}]}`
-	result, err := parseCompletion(raw)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	var extracted map[string]any
-	if err := json.Unmarshal(result, &extracted); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := extracted["companies"]; !ok {
-		t.Error("missing companies key")
-	}
-}
+		Context("with JSON embedded in a preamble", func() {
+			It("extracts and parses the JSON", func() {
+				rawJSON := `{"guests":[],"companies":[{"name":"Beta","business_model":"B2B","customers":"enterprises"}]}`
+				raw := "Here is the extracted data: " + rawJSON
+				result, err := parseCompletion(raw)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(MatchJSON(rawJSON))
+			})
+		})
 
-func TestParseCompletion_NoJSONReturnsError(t *testing.T) {
-	_, err := parseCompletion("no json here at all")
-	if err == nil {
-		t.Error("want error for response with no JSON, got nil")
-	}
-}
+		Context("when the completion is invalid", func() {
+			It("returns an error if no JSON is found", func() {
+				_, err := parseCompletion("no json here at all")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal("no JSON in completion"))
+			})
 
-func TestParseCompletion_EmptyStringReturnsError(t *testing.T) {
-	_, err := parseCompletion("")
-	if err == nil {
-		t.Error("want error for empty completion, got nil")
-	}
-}
+			It("returns an error for an empty string", func() {
+				_, err := parseCompletion("")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal("no JSON in completion"))
+			})
 
-func TestParseCompletion_MalformedJSONReturnsError(t *testing.T) {
-	_, err := parseCompletion(`{"guests": [broken`)
-	if err == nil {
-		t.Error("want error for malformed JSON, got nil")
-	}
-}
+			It("returns an error for malformed JSON", func() {
+				_, err := parseCompletion(`{"guests": [broken`)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+})
