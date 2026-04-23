@@ -53,6 +53,6 @@ release:
   github:
     owner: gavmor
     name: podpedia
-  draft: true
+  draft: false
   prerelease: auto
   mode: replace
