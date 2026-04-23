@@ -4,13 +4,11 @@ version: 2
 
 project_name: podpedia
 
-before:
-  hooks:
-    - make plugins
-
 builds:
   - env:
       - CGO_ENABLED=0
+    hooks:
+      pre: make plugins
     goos:
       - linux
       - darwin
