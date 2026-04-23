@@ -1,0 +1,20 @@
+# lefthook.yml
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    linter:
+      glob: "*.go"
+      run: go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run {staged_files}
+    unit-tests:
+      glob: "*.go"
+      run: go test -v ./internal/...
+
+pre-push:
+  parallel: true
+  commands:
+    full-ci:
+      run: make ci
+    tidy:
+      run: go mod tidy && git diff --exit-code go.mod go.sum
