@@ -164,3 +164,30 @@ cd plugins/rss && GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o ../../
 # Remove compiled plugins
 make clean
 ```
+
+# Request for Contributions
+
+Podpedia is built on a modular, plugin-agnostic architecture. We are looking for contributors to help expand the pipeline with new capabilities:
+
+### Enrichment & Validation
+*   **Entity Linker:** Link extracted guests and companies to Wikipedia, LinkedIn, or Crunchbase.
+*   **Fact Checker:** Verify "Key Arguments" against external sources using search-enabled LLMs.
+
+### Content Generation
+*   **Chapter Generator:** Automatically generate time-coded segments and table of contents.
+*   **TL;DR Summarizer:** Generate executive summaries or formatted "Show Notes" in Markdown.
+*   **Social Hook Generator:** Create threads/posts for Twitter and LinkedIn based on episode insights.
+
+### Intelligence & Context
+*   **Cross-Reference Linker:** Build a "knowledge web" by linking mentions across different episodes.
+*   **Sentiment & Tone Analyzer:** Extract the "vibe" of discussions (e.g., Skeptical, Bullish, Academic).
+
+### Infrastructure & Distribution
+*   **Vector Embedding Store:** Generate embeddings for semantic search across the entire library.
+*   **Translation Stage:** Translate transcripts to English before extraction for multilingual support.
+*   **Notification Plugin:** Trigger Webhooks or Slack alerts when specific keywords are detected.
+
+### Alternative Ingestion
+*   **YouTube Ingester:** A plugin to pull audio from YouTube channels via `yt-dlp`.
+
+If you're interested in building a plugin, check out the [WASM Microkernel Guest SDK](https://github.com/gavmor/wasm-microkernel).
