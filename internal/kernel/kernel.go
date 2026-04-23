@@ -61,6 +61,11 @@ func (k *Kernel) Load(name, path string) error {
 		return fmt.Errorf("read plugin %s: %w", name, err)
 	}
 
+	return k.LoadBytes(name, wasmBytes)
+}
+
+// LoadBytes stores WASM plugin bytes for execution.
+func (k *Kernel) LoadBytes(name string, wasmBytes []byte) error {
 	k.mu.Lock()
 	k.plugins[name] = wasmBytes
 	k.mu.Unlock()

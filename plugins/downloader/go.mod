@@ -6,7 +6,6 @@ module github.com/gavmor/podpedia/plugins/downloader
 go 1.26.1
 
 require (
-	github.com/extism/go-pdk v1.1.3
 	github.com/gavmor/wasm-microkernel v0.9.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
@@ -14,6 +13,7 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/extism/go-pdk v1.1.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect

@@ -7,10 +7,10 @@ WASM_FLAGS := -buildmode=c-shared
 
 .PHONY: all build run plugins clean test test-plugins ci $(PLUGINS)
 
-all: build plugins
+all: plugins build
 
 ## Build host binary into bin/
-build:
+build: plugins
 	@echo "[build] host: $(BINARY_NAME)"
 	@mkdir -p bin
 	$(GO) build -o bin/$(BINARY_NAME) $(MAIN_PATH)

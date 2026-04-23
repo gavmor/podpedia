@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"github.com/gavmor/podpedia/internal/pipeline"
 	"github.com/spf13/cobra"
 )
+
+var DefaultPlugins embed.FS
 
 var (
 	rssURL        string
@@ -29,7 +32,7 @@ var runCmd = &cobra.Command{
 	Long: `Starts the full pipeline via WASM plugins:
   RSS parse → Audio download → Transcription → Entity extraction → Storage
 
-Each stage is a sandboxed WASM plugin loaded from --plugins.`,
+Each stage is a sandboxed WASM plugin. Uses embedded defaults unless --plugins is provided.`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if rssURL == "" {
@@ -64,9 +67,26 @@ Each stage is a sandboxed WASM plugin loaded from --plugins.`,
 		plugins := []string{"rss", "downloader", "transcriber", "extractor", "store"}
 
 		for _, name := range plugins {
-			path := fmt.Sprintf("%s/%s.wasm", pluginDir, name)
-			if err := k.Load(name, path); err != nil {
-				logger.Error("plugin-load", err, lager.Data{"plugin": name, "path": path})
+			// 1. Try to load from provided --plugins directory first
+			if cmd.Flags().Changed("plugins") {
+				path := fmt.Sprintf("%s/%s.wasm", pluginDir, name)
+				if err := k.Load(name, path); err == nil {
+					continue
+				} else {
+					logger.Info("plugin-load-disk-failed-falling-back", lager.Data{"plugin": name, "path": path, "error": err.Error()})
+				}
+			}
+
+			// 2. Fall back to embedded plugins
+			embedPath := fmt.Sprintf("dist/plugins/%s.wasm", name)
+			wasmBytes, err := DefaultPlugins.ReadFile(embedPath)
+			if err != nil {
+				logger.Error("plugin-load-embedded-failed", err, lager.Data{"plugin": name, "path": embedPath})
+				os.Exit(1)
+			}
+
+			if err := k.LoadBytes(name, wasmBytes); err != nil {
+				logger.Error("plugin-load-bytes-failed", err, lager.Data{"plugin": name})
 				os.Exit(1)
 			}
 		}
