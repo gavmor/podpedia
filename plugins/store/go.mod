@@ -7,7 +7,7 @@ go 1.26.1
 
 require (
 	github.com/gavmor/podpedia v0.2.2
-	github.com/gavmor/wasm-microkernel v0.8.0
+	github.com/gavmor/wasm-microkernel v0.9.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/samber/lo v1.53.0

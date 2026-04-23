@@ -6,7 +6,7 @@ module github.com/gavmor/podpedia/plugins/rss
 go 1.26.1
 
 require (
-	github.com/gavmor/wasm-microkernel v0.8.0
+	github.com/gavmor/wasm-microkernel v0.9.0
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
