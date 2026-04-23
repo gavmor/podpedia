@@ -72,7 +72,7 @@ var _ = Describe("Ollama Integration", func() {
 
 	AfterEach(func() {
 		if k != nil {
-			k.Close()
+			_ = k.Close()
 		}
 		_ = os.RemoveAll(outputDir)
 	})
@@ -96,7 +96,7 @@ var _ = Describe("Ollama Integration", func() {
 		p.WithScheme(scheme, "integration")
 
 		// Capture stdout to see plugin logs if any
-		err = p.Run("dummy", outputDir) // Run will fail because dummy isn't a URL, but we just want to test if k.Call works
+		_ = p.Run("dummy", outputDir) // Run will fail because dummy isn't a URL, but we just want to test if k.Call works
 		// Actually, let's just call the extractor directly via the kernel adapter
 		
 		extractor := kernel.NewExtractor(k)

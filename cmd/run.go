@@ -60,7 +60,7 @@ Each stage is a sandboxed WASM plugin. Uses embedded defaults unless --plugins i
 			logger.Error("kernel-init", err)
 			os.Exit(1)
 		}
-		defer k.Close()
+		defer func() { _ = k.Close() }()
 
 		k.SetOutputDir(absOutput)
 
