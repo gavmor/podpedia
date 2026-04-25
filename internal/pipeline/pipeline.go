@@ -15,7 +15,7 @@ import (
 
 // Consumer-driven interfaces
 type Transcriber interface {
-	Transcribe(audioURL string) (string, error)
+	Transcribe(ep types.Episode) (string, error)
 }
 
 type Extractor interface {
@@ -137,7 +137,7 @@ func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
 		}
 
 		lsess.Info("transcribing")
-		transcript, err := p.transcriber.Transcribe(ep.AudioURL)
+		transcript, err := p.transcriber.Transcribe(ep)
 		if err != nil {
 			lsess.Error("failed-transcription", err)
 			return

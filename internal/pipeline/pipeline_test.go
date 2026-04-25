@@ -18,7 +18,7 @@ import (
 // Mock implementations for testing
 type mockTranscriber struct{}
 
-func (m *mockTranscriber) Transcribe(audioURL string) (string, error) {
+func (m *mockTranscriber) Transcribe(ep types.Episode) (string, error) {
 	return GoTimeTranscriptFixture, nil
 }
 

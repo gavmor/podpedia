@@ -41,11 +41,15 @@ func NewTranscriber(pk *PodpediaKernel) *transcriber {
 	return &transcriber{pk: pk}
 }
 
-func (t *transcriber) Transcribe(audioURL string) (string, error) {
+func (t *transcriber) Transcribe(ep types.Episode) (string, error) {
 	req := struct {
 		AudioURL string `json:"audio_url"`
+		Title    string `json:"title"`
+		Notes    string `json:"notes"`
 	}{
-		AudioURL: audioURL,
+		AudioURL: ep.AudioURL,
+		Title:    ep.Title,
+		Notes:    ep.Description,
 	}
 
 	config := map[string]string{
