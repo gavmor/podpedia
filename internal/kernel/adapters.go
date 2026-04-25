@@ -44,12 +44,10 @@ func NewTranscriber(pk *PodpediaKernel) *transcriber {
 func (t *transcriber) Transcribe(ep types.Episode) (string, error) {
 	req := struct {
 		AudioURL string `json:"audio_url"`
-		Title    string `json:"title"`
-		Notes    string `json:"notes"`
+		Prompt   string `json:"prompt"`
 	}{
 		AudioURL: ep.AudioURL,
-		Title:    ep.Title,
-		Notes:    ep.Description,
+		Prompt:   asrPrompt(ep),
 	}
 
 	config := map[string]string{
@@ -62,6 +60,20 @@ func (t *transcriber) Transcribe(ep types.Episode) (string, error) {
 	}
 
 	return string(res), nil
+}
+
+// asrPrompt builds an ASR initial prompt from podcast episode metadata.
+// Whisper uses this to bias vocabulary towards proper nouns in the title
+// and description before seeing any audio.
+func asrPrompt(ep types.Episode) string {
+	switch {
+	case ep.Title != "" && ep.Description != "":
+		return ep.Title + "\n\n" + ep.Description
+	case ep.Title != "":
+		return ep.Title
+	default:
+		return ep.Description
+	}
 }
 
 // Extractor adapter

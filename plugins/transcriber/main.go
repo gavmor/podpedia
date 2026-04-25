@@ -11,8 +11,7 @@ func init() {
 	guest.Register(func(reqJSON string) (string, error) {
 		var req struct {
 			AudioURL string `json:"audio_url"`
-			Title    string `json:"title"`
-			Notes    string `json:"notes"`
+			Prompt   string `json:"prompt"`
 		}
 		if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
 			return "", err
@@ -25,7 +24,7 @@ func init() {
 
 		guest.LogMsg("transcribing: " + req.AudioURL)
 
-		rawRes, err := guest.HttpPost(transcribeURL, buildTranscribeBody(req.AudioURL, req.Title, req.Notes))
+		rawRes, err := guest.HttpPost(transcribeURL, buildTranscribeBody(req.AudioURL, req.Prompt))
 		if err != nil {
 			return "", fmt.Errorf("host http-post failed: %v", err)
 		}
