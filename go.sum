@@ -51,6 +51,8 @@ github.com/gavmor/wasm-microkernel v0.10.0 h1:S9c6QSY7Tm58mr88hh21FW5zQAB4VQMwFS
 github.com/gavmor/wasm-microkernel v0.10.0/go.mod h1:DeWZQvzFCJ9OfnQFcTzCWzE/4cpwszyVT3q2JJxC0pc=
 github.com/gavmor/wasm-microkernel v0.12.0 h1:kQZ3ldRvnDd1fqwCYDG4JRjjVpECgmWVIyXKhqKBbL4=
 github.com/gavmor/wasm-microkernel v0.12.0/go.mod h1:DeWZQvzFCJ9OfnQFcTzCWzE/4cpwszyVT3q2JJxC0pc=
+github.com/gavmor/wasm-microkernel v0.12.1 h1:mLCqobHpU1SRgtfQ+rCXpHLY8/5mXiF6N3yAEXpzRDk=
+github.com/gavmor/wasm-microkernel v0.12.1/go.mod h1:DeWZQvzFCJ9OfnQFcTzCWzE/4cpwszyVT3q2JJxC0pc=
 github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433 h1:vymEbVwYFP/L05h5TKQxvkXoKxNvTpjxYKdF1Nlwuao=
 github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433/go.mod h1:tphK2c80bpPhMOI4v6bIc2xWywPfbqi1Z06+RcrMkDg=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=

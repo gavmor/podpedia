@@ -6,7 +6,7 @@ module github.com/gavmor/podpedia/plugins/downloader
 go 1.26.1
 
 require (
-	github.com/gavmor/wasm-microkernel v0.12.0
+	github.com/gavmor/wasm-microkernel v0.12.1
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 )
