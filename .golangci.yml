@@ -7,7 +7,6 @@ linters:
     - ineffassign
     - errcheck
     - unused
-    - typecheck
 
 run:
   timeout: 5m
