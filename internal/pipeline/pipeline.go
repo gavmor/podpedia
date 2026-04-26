@@ -162,11 +162,8 @@ func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
 		lsess.Error("failed-save-structured", err)
 	}
 
-
-
 	lsess.Info("completed")
 }
-
 
 func validateEpisode(ep types.Episode) error {
 	if ep.Title == "" {

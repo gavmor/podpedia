@@ -78,7 +78,6 @@ type StoreStructuredRequest struct {
 	SchemeID  string          `json:"scheme_id,omitempty"` // Used for filename suffix
 }
 
-
 type StoreResponse struct {
 	Path string `json:"path"`
 }

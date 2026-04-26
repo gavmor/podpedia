@@ -33,4 +33,3 @@ func (s *Store) SaveStructuredData(outputDir string, entry types.EncyclopediaEnt
 	}
 	return os.WriteFile(fmt.Sprintf("%s/%s_entry.json", outputDir, entry.EpisodeID), jsonData, 0644)
 }
-
