@@ -41,3 +41,6 @@ func init() {
 }
 
 func main() {}
+
+//go:wasmexport execute
+func execute() int32 { return guest.Execute() }
