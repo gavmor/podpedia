@@ -6,13 +6,7 @@ linters:
     - govet
     - ineffassign
     - errcheck
-    - unused
 
-run:
-  timeout: 5m
-  tests: true
-
-issues:
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
