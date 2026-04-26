@@ -50,10 +50,12 @@ func (m *mockStore) SaveRawData(outputDir string, ep types.Episode) error {
 
 func (m *mockStore) SaveStructuredData(outputDir string, ep types.Episode, entry []byte, schemeID string) error {
 	m.StructuredSaved = true
-	
+
 	id := ep.ID
-	if id == "" { id = "unknown" }
-	
+	if id == "" {
+		id = "unknown"
+	}
+
 	key := fmt.Sprintf("%s_%s", testSlug(id), schemeID)
 	m.savedStructured[key] = entry
 	return nil
@@ -141,17 +143,17 @@ var _ = Describe("Pipeline", func() {
 		It("correctly propagates a custom scheme and names the file correctly", func() {
 			scheme := []byte(`{"sentiment": "positive"}`)
 			schemeID := "sentiment"
-			
+
 			By("setting a custom scheme")
 			pipeline.WithScheme(scheme, schemeID)
-			
+
 			err := pipeline.Run(ts.URL, outDir)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying the specific file was 'saved'")
 			expectedKey := "test_ep_1_sentiment"
 			Expect(store.savedStructured).To(HaveKey(expectedKey))
-			
+
 			By("verifying the content of the saved data")
 			Expect(store.savedStructured[expectedKey]).To(MatchJSON(`{"episode_id": "test-ep-1", "mocked": true}`))
 		})

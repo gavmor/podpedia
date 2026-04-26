@@ -89,7 +89,7 @@ var _ = Describe("Ollama Integration", func() {
 		// Capture stdout to see plugin logs if any
 		_ = p.Run("dummy", outputDir) // Run will fail because dummy isn't a URL, but we just want to test if k.Call works
 		// Actually, let's just call the extractor directly via the kernel adapter
-		
+
 		ext := kernel.NewExtractor(k)
 		res, err := ext.ExtractEntities(ep, scheme)
 		Expect(err).NotTo(HaveOccurred())
