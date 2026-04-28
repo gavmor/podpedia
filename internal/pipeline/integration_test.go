@@ -23,9 +23,9 @@ var _ = Describe("Ollama Integration", func() {
 	)
 
 	BeforeEach(func() {
-		// Skip if OLLAMA_URL is not set or if we are in a restricted environment
-		if os.Getenv("OLLAMA_URL") == "" && os.Getenv("CI") != "" {
-			Skip("OLLAMA_URL not set and running in CI")
+		// Skip unless explicitly enabled with ENABLE_OLLAMA_INTEGRATION_TESTS
+		if os.Getenv("ENABLE_OLLAMA_INTEGRATION_TESTS") == "" {
+			Skip("Ollama integration tests disabled by default. Set ENABLE_OLLAMA_INTEGRATION_TESTS=1 to enable.")
 		}
 
 		ollamaURL := os.Getenv("OLLAMA_URL")
