@@ -6,7 +6,7 @@ pre-commit:
   commands:
     linter:
       glob: "*.go"
-      run: go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run {staged_files}
+      run: make lint
     unit-tests:
       glob: "*.go"
       run: go test -v ./internal/...
