@@ -5,11 +5,11 @@ go 1.26.1
 require (
 	code.cloudfoundry.org/lager/v3 v3.1.0
 	github.com/alitto/pond v1.9.2
-	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gavmor/wasm-microkernel v0.12.1
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/onsi/ginkgo/v2 v2.22.1
 	github.com/onsi/gomega v1.36.1
+	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 )
 
@@ -71,7 +71,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.3.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/schollz/progressbar/v3 v3.19.0 // indirect
-	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
 	github.com/tetratelabs/wazero v1.11.0 // indirect

@@ -14,6 +14,7 @@ Podpedia is a podcast analysis tool designed to build a structured encyclopedia 
 - **RSS Ingestion:** Automated fetching and parsing of podcast feeds.
 - **Local LLM Extraction:** Use of Ollama and OpenAI-compatible inference engines for data extraction.
 - **Search & Discovery:** Tools to find guests and companies across massive episode backlogs.
+- **Library Support:** Exported as a reusable Go library (`pkg/podpedia`) for integration into serverless or cloud-native applications.
 - **Data Export:** Exporting findings to various formats for external use.
 - **Knowledge Graph Visualization:** Visualizing the connections between people, companies, and ideas.
 

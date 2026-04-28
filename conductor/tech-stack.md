@@ -7,6 +7,7 @@
 ## Data & Storage
 - **RSS Parser:** [gofeed](https://github.com/mmcdole/gofeed) - Universal feed parser for RSS, Atom, and JSON feeds with support for iTunes and Dublin Core extensions.
 - **File Downloader:** [grab](https://github.com/cavaliercoder/grab) - Robust, production-ready concurrent downloader with retry support and CDN quirk handling.
+- **Filesystem Abstraction:** [afero](https://github.com/spf13/afero) - Filesystem abstraction layer for Go, enabling in-memory storage and Cloud Storage adapters.
 - **Primary Storage:** Markdown files - Portability and ease of search/editing.
 - **Data Exchange:** JSON - Standard format for structured exports.
 

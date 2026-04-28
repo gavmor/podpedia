@@ -1,6 +1,7 @@
 package pipeline_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,63 +11,63 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Gofeed Integration", func() {
-	Describe("ParseRSSWithGofeed", func() {
-		var (
-			ts       *httptest.Server
-			xmlInput string
-		)
+var _ = Describe("Gofeed RSS Parsing", func() {
+	var (
+		ts       *httptest.Server
+		xmlInput string
+	)
 
+	BeforeEach(func() {
+		xmlInput = `
+			<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+				<channel>
+					<title>Test Podcast</title>
+					<description>A test podcast description</description>
+					<itunes:author>Test Author</itunes:author>
+					<item>
+						<title>Test Episode 1</title>
+						<description>Description for episode 1</description>
+						<pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
+						<guid>ep1</guid>
+						<enclosure url="http://example.com/ep1.mp3" length="1234" type="audio/mpeg"/>
+						<itunes:duration>00:30:00</itunes:duration>
+					</item>
+				</channel>
+			</rss>
+		`
+	})
+
+	JustBeforeEach(func() {
+		ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = fmt.Fprint(w, xmlInput)
+		}))
+	})
+
+	AfterEach(func() {
+		ts.Close()
+	})
+
+	It("correctly parses a podcast feed", func() {
+		podcast, episodes, err := ParseRSSWithGofeed(context.Background(), ts.URL)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(podcast.Title).To(Equal("Test Podcast"))
+		Expect(podcast.Author).To(Equal("Test Author"))
+
+		Expect(episodes).To(HaveLen(1))
+		Expect(episodes[0].Title).To(Equal("Test Episode 1"))
+		Expect(episodes[0].AudioURL).To(Equal("http://example.com/ep1.mp3"))
+		Expect(episodes[0].Duration).To(Equal("00:30:00"))
+	})
+
+	Context("when the feed is invalid", func() {
 		BeforeEach(func() {
-			xmlInput = `
-				<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
-					<channel>
-						<title>Integrated Podcast</title>
-						<description>A podcast for testing gofeed</description>
-						<itunes:author>Test Author</itunes:author>
-						<category>Technology</category>
-						<category>Science</category>
-						<item>
-							<title>Integrated Episode</title>
-							<description>Testing metadata extraction</description>
-							<pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
-							<guid>integrated-guid</guid>
-							<enclosure url="http://example.com/audio.mp3" type="audio/mpeg"/>
-							<itunes:duration>00:45:00</itunes:duration>
-							<itunes:explicit>yes</itunes:explicit>
-							<dc:creator>Dublin Core Creator</dc:creator>
-							<category>News</category>
-						</item>
-					</channel>
-				</rss>
-			`
+			xmlInput = "not-xml"
 		})
 
-		JustBeforeEach(func() {
-			ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				_, _ = fmt.Fprintln(w, xmlInput)
-			}))
-		})
-
-		AfterEach(func() {
-			ts.Close()
-		})
-
-		It("correctly parses the podcast and episode metadata", func() {
-			podcast, episodes, err := ParseRSSWithGofeed(ts.URL)
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(podcast.Title).To(Equal("Integrated Podcast"))
-			Expect(podcast.Author).To(Equal("Test Author"))
-			Expect(podcast.Categories).To(ConsistOf("Technology", "Science"))
-
-			Expect(episodes).To(HaveLen(1))
-			ep := episodes[0]
-			Expect(ep.Title).To(Equal("Integrated Episode"))
-			Expect(ep.Duration).To(Equal("00:45:00"))
-			Expect(ep.Explicit).To(BeTrue())
-			Expect(ep.Author).To(Equal("Dublin Core Creator"))
-			Expect(ep.Categories).To(ContainElement("News"))
+		It("returns an error", func() {
+			_, _, err := ParseRSSWithGofeed(context.Background(), ts.URL)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })

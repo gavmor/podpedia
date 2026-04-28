@@ -1,46 +1,53 @@
 package pipeline
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"code.cloudfoundry.org/lager/v3"
 	"github.com/alitto/pond"
 	"github.com/gavmor/podpedia/internal/types"
 	"github.com/mmcdole/gofeed"
+	"github.com/spf13/afero"
 )
 
 // Consumer-driven interfaces
 type Transcriber interface {
-	Transcribe(ep types.Episode) (string, error)
+	// Transcribe is generic and only knows about the audio source and an optional text hint for biasing.
+	// It no longer depends on Podpedia domain concepts like 'Episode'.
+	Transcribe(ctx context.Context, audioURL string, prompt string) (string, error)
 }
 
 type Extractor interface {
-	ExtractEntities(ep types.Episode, scheme []byte) ([]byte, error)
+	ExtractEntities(ctx context.Context, ep *types.Episode, scheme []byte) ([]byte, error)
 }
 
 type AudioDownloader interface {
-	DownloadAudio(url string, dest string) error
+	DownloadAudio(ctx context.Context, fs afero.Fs, url string, dest string) error
 }
 
 type Store interface {
-	SaveRawData(outputDir string, ep types.Episode) error
-	SaveStructuredData(outputDir string, ep types.Episode, entry []byte, schemeID string) error
+	SaveRawData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode) error
+	SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error
 }
 
 type Pipeline struct {
-	logger       lager.Logger
-	transcriber  Transcriber
-	extractor    Extractor
-	downloader   AudioDownloader
-	store        Store
-	maxWorkers   int
-	limit        int
-	outputScheme []byte
-	schemeID     string
+	logger            lager.Logger
+	transcriber       Transcriber
+	extractor         Extractor
+	downloader        AudioDownloader
+	store             Store
+	Workspace         afero.Fs
+	onEpisodeComplete func(ep types.Episode, err error)
+	maxWorkers        int
+	limit             int
+	outputScheme      []byte
+	schemeID          string
 }
 
 func NewPipeline(
@@ -56,8 +63,21 @@ func NewPipeline(
 		extractor:   extractor,
 		downloader:  downloader,
 		store:       store,
+		Workspace:   afero.NewOsFs(),
 		maxWorkers:  runtime.NumCPU(),
 	}
+}
+
+func (p *Pipeline) OnEpisodeComplete(callback func(ep types.Episode, err error)) *Pipeline {
+	p.onEpisodeComplete = callback
+	return p
+}
+
+func (p *Pipeline) WithWorkspace(fs afero.Fs) *Pipeline {
+	if fs != nil {
+		p.Workspace = fs
+	}
+	return p
 }
 
 func (p *Pipeline) WithLimit(n int) *Pipeline {
@@ -71,13 +91,13 @@ func (p *Pipeline) WithScheme(scheme []byte, id string) *Pipeline {
 	return p
 }
 
-func (p *Pipeline) Run(rssURL string, outputDir string) error {
+func (p *Pipeline) Run(ctx context.Context, rssURL string, outputDir string) error {
 	p.logger.Info("starting", lager.Data{"feed": rssURL, "output": outputDir, "scheme": p.schemeID})
 
-	_, episodes, err := ParseRSSWithGofeed(rssURL)
+	_, episodes, err := ParseRSSWithGofeed(ctx, rssURL)
 	if err != nil {
 		p.logger.Error("failed-parsing-feed", err)
-		return fmt.Errorf("failed to fetch RSS feed: %w", err)
+		return fmt.Errorf("%w: failed to fetch RSS feed: %v", ErrInvalidFeed, err)
 	}
 
 	if p.limit > 0 && len(episodes) > p.limit {
@@ -90,82 +110,141 @@ func (p *Pipeline) Run(rssURL string, outputDir string) error {
 	pool := pond.New(p.maxWorkers, 0, pond.IdleTimeout(10*time.Second))
 	defer pool.StopAndWait()
 
+	group, groupCtx := pool.GroupContext(ctx)
+
+	var mu sync.Mutex
+	var errs []error
+
 	startTime := time.Now()
 
 	for _, ep := range episodes {
 		episode := ep
-		pool.Submit(func() {
-			p.processEpisode(episode, outputDir)
+		group.Submit(func() error {
+			err := p.processEpisode(groupCtx, &episode, outputDir)
+
+			if p.onEpisodeComplete != nil {
+				p.onEpisodeComplete(episode, err)
+			}
+
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
+			}
+			return err
 		})
 	}
 
-	pool.StopAndWait()
+	// Wait for all tasks to complete or for the first error to occur
+	if err := group.Wait(); err != nil {
+		mu.Lock()
+		errs = append(errs, err)
+		mu.Unlock()
+	}
+
+	if len(errs) > 0 {
+		combinedErr := errors.Join(errs...)
+		p.logger.Error("pipeline-failed", combinedErr)
+		return combinedErr
+	}
+
 	p.logger.Info("completed", lager.Data{"duration": time.Since(startTime).String()})
 	return nil
 }
 
-func (p *Pipeline) processEpisode(ep types.Episode, outputDir string) {
+func (p *Pipeline) ProcessEpisode(ctx context.Context, ep *types.Episode, outputDir string) error {
+	return p.processEpisode(ctx, ep, outputDir)
+}
+
+func (p *Pipeline) processEpisode(ctx context.Context, ep *types.Episode, outputDir string) error {
 	lsess := p.logger.Session("process-episode", lager.Data{"episode": ep.ID})
 	lsess.Info("starting")
 
+	// Check if context is already cancelled
+	if ctx.Err() != nil {
+		lsess.Info("context-cancelled-aborting")
+		return ctx.Err()
+	}
+
 	// Transcribe if needed
 	transcriptPath := fmt.Sprintf("%s/%s_raw.txt", outputDir, slug(ep.ID))
-	if _, err := os.Stat(transcriptPath); err == nil {
+	if _, err := p.Workspace.Stat(transcriptPath); err == nil {
 		lsess.Info("transcript-already-exists-loading")
-		content, err := os.ReadFile(transcriptPath)
+		content, err := afero.ReadFile(p.Workspace, transcriptPath)
 		if err == nil {
 			ep.Transcript = string(content)
 		} else {
 			lsess.Error("failed-read-existing-transcript", err)
+			return fmt.Errorf("failed to read existing transcript: %w", err)
 		}
 	}
 
 	if ep.Transcript == "" {
 		// Download audio only if we actually need to transcribe
 		audioPath := fmt.Sprintf("%s/%s.mp3", outputDir, slug(ep.ID))
-		if _, err := os.Stat(audioPath); err == nil {
+		exists, _ := afero.Exists(p.Workspace, audioPath)
+		if exists {
 			lsess.Info("audio-already-exists-skipping-download")
-		} else if os.IsNotExist(err) {
-			lsess.Info("downloading-audio")
-			if err := p.downloader.DownloadAudio(ep.AudioURL, audioPath); err != nil {
-				lsess.Error("failed-download", err)
-				return
-			}
 		} else {
-			lsess.Error("failed-stat-audio", err)
-			return
+			lsess.Info("downloading-audio")
+			if err := p.downloader.DownloadAudio(ctx, p.Workspace, ep.AudioURL, audioPath); err != nil {
+				lsess.Error("failed-download", err)
+				return fmt.Errorf("%w: failed to download audio: %v", ErrDownloadFailed, err)
+			}
 		}
 
 		lsess.Info("transcribing")
-		transcript, err := p.transcriber.Transcribe(ep)
+		// Anti-Corruption Layer: The Pipeline translates its domain concept (Episode)
+		// into generic instructions for the infrastructure (audioURL and prompt/hint).
+		hint := p.generateTranscriptionHint(ep)
+		transcript, err := p.transcriber.Transcribe(ctx, ep.AudioURL, hint)
 		if err != nil {
 			lsess.Error("failed-transcription", err)
-			return
+			return fmt.Errorf("%w: failed transcription: %v", ErrTranscriptionTimeout, err)
 		}
 		ep.Transcript = transcript
 
 		// Save raw data immediately after transcription
-		if err := p.store.SaveRawData(outputDir, ep); err != nil {
+		if err := p.store.SaveRawData(ctx, p.Workspace, outputDir, ep); err != nil {
 			lsess.Error("failed-save-raw", err)
+			return fmt.Errorf("%w: failed to save raw data: %v", ErrStoreFailed, err)
 		}
 	}
 
 	lsess.Info("extracting-entities")
-	entry, err := p.extractor.ExtractEntities(ep, p.outputScheme)
+	entry, err := p.extractor.ExtractEntities(ctx, ep, p.outputScheme)
 	if err != nil {
 		lsess.Error("failed-extraction", err)
-		// No reliable generic "minimal" entry for arbitrary schemes
-		return
+		return fmt.Errorf("%w: failed extraction: %v", ErrExtractionFailed, err)
 	}
 
-	if err := p.store.SaveStructuredData(outputDir, ep, entry, p.schemeID); err != nil {
+	if err := p.store.SaveStructuredData(ctx, p.Workspace, outputDir, ep, entry, p.schemeID); err != nil {
 		lsess.Error("failed-save-structured", err)
+		return fmt.Errorf("%w: failed to save structured data: %v", ErrStoreFailed, err)
 	}
 
 	lsess.Info("completed")
+	return nil
 }
 
-func validateEpisode(ep types.Episode) error {
+// generateTranscriptionHint builds an ASR initial prompt from podcast episode metadata.
+// This logic belongs in the domain layer as it decides how to bias the transcription
+// based on what we know about the episode.
+func (p *Pipeline) generateTranscriptionHint(ep *types.Episode) string {
+	switch {
+	case ep.Title != "" && ep.Description != "":
+		return ep.Title + "\n\n" + ep.Description
+	case ep.Title != "":
+		return ep.Title
+	default:
+		return ep.Description
+	}
+}
+
+func validateEpisode(ep *types.Episode) error {
+	if ep.ID == "" {
+		return fmt.Errorf("missing episode ID")
+	}
 	if ep.Title == "" {
 		return fmt.Errorf("missing episode title")
 	}
@@ -175,9 +254,9 @@ func validateEpisode(ep types.Episode) error {
 	return nil
 }
 
-func ParseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
+func ParseRSSWithGofeed(ctx context.Context, url string) (types.Podcast, []types.Episode, error) {
 	fp := gofeed.NewParser()
-	feed, err := fp.ParseURL(url)
+	feed, err := fp.ParseURLWithContext(url, ctx)
 	if err != nil {
 		return types.Podcast{}, nil, fmt.Errorf("failed to parse RSS feed: %w", err)
 	}
@@ -225,7 +304,7 @@ func ParseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 			ep.AudioURL = item.Enclosures[0].URL
 		}
 
-		if err := validateEpisode(ep); err != nil {
+		if err := validateEpisode(&ep); err != nil {
 			fmt.Printf("[Pipeline] Skipping invalid episode: %v\n", err)
 			continue
 		}
@@ -233,6 +312,10 @@ func ParseRSSWithGofeed(url string) (types.Podcast, []types.Episode, error) {
 	}
 
 	return podcast, episodes, nil
+}
+
+func Slug(s string) string {
+	return slug(s)
 }
 
 func slug(s string) string {
