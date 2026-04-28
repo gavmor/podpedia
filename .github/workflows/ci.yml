@@ -22,7 +22,7 @@ jobs:
 
       - run: go mod download
       - name: Build WASM Plugins
-        run: make plugins
+        run: make plugins-build
       - run: go test -v ./...
 
   lint:
@@ -39,7 +39,7 @@ jobs:
           cache: true
 
       - name: Build WASM Plugins
-        run: make plugins
+        run: make plugins-build
       - uses: golangci/golangci-lint-action@v7
         with:
           version: v2.11.4
