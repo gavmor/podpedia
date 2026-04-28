@@ -1,14 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"code.cloudfoundry.org/lager/v3"
-	"github.com/gavmor/podpedia/internal/kernel"
-	"github.com/gavmor/podpedia/internal/pipeline"
+	"github.com/gavmor/podpedia/pkg/podpedia"
 	"github.com/spf13/cobra"
 )
 
@@ -52,8 +54,55 @@ Each stage is a sandboxed WASM plugin. Uses embedded defaults unless --plugins i
 		logger := lager.NewLogger("podpedia")
 		logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.INFO))
 
-		k := kernel.NewPodpediaKernel(ollamaURL, ollamaModel, transcribeURL)
-		defer func() { _ = k.Close() }()
+		opts := []podpedia.Option{
+			podpedia.WithLogger(logger),
+			podpedia.WithOllamaURL(ollamaURL),
+			podpedia.WithOllamaModel(ollamaModel),
+			podpedia.WithTranscribeURL(transcribeURL),
+		}
+
+		if episodeLimit > 0 {
+			opts = append(opts, podpedia.WithLimit(episodeLimit))
+		}
+
+		if outputScheme != "" {
+			schemeBytes, err := os.ReadFile(outputScheme)
+			if err != nil {
+				fmt.Printf("Error: failed to read output scheme file %q: %v\n", outputScheme, err)
+				os.Exit(1)
+			}
+			id := filepath.Base(outputScheme)
+			if ext := filepath.Ext(id); ext != "" {
+				id = id[:len(id)-len(ext)]
+			}
+			opts = append(opts, podpedia.WithScheme(schemeBytes, id))
+		}
+
+		app, err := podpedia.NewApp(opts...)
+		if err != nil {
+			fmt.Printf("Error: failed to initialize application: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() { _ = app.Close() }()
+
+		// Create a cancelable context tied to OS signals
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+
+		// Use an explicit signal channel for logging to avoid false positives from stop()
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+		// Listen for signals to log and allow forced exit
+		go func() {
+			select {
+			case <-sigCh:
+				logger.Info("signal-received-cancelling-gracefully", lager.Data{"hint": "press Ctrl+C again to force exit"})
+				signal.Stop(sigCh) // stop listening for signals to restore default behavior
+			case <-ctx.Done():
+				// Context cancelled by other means
+			}
+		}()
 
 		plugins := []string{"rss", "downloader", "transcriber", "extractor", "store"}
 
@@ -80,35 +129,14 @@ Each stage is a sandboxed WASM plugin. Uses embedded defaults unless --plugins i
 				}
 			}
 
-			k.Load(name, wasmBytes)
+			app.LoadPlugin(name, wasmBytes)
 		}
 
-		p := pipeline.NewPipeline(
-			logger,
-			kernel.NewTranscriber(k),
-			kernel.NewExtractor(k),
-			kernel.NewDownloader(k),
-			kernel.NewStore(k),
-		)
-
-		if episodeLimit > 0 {
-			p.WithLimit(episodeLimit)
-		}
-
-		if outputScheme != "" {
-			schemeBytes, err := os.ReadFile(outputScheme)
-			if err != nil {
-				fmt.Printf("Error: failed to read output scheme file %q: %v\n", outputScheme, err)
-				os.Exit(1)
+		if err := app.Run(ctx, rssURL, absOutput); err != nil {
+			if ctx.Err() != nil {
+				logger.Info("run-cancelled-by-user")
+				os.Exit(0)
 			}
-			id := filepath.Base(outputScheme)
-			if ext := filepath.Ext(id); ext != "" {
-				id = id[:len(id)-len(ext)]
-			}
-			p.WithScheme(schemeBytes, id)
-		}
-
-		if err := p.Run(rssURL, absOutput); err != nil {
 			logger.Error("pipeline-failed", err)
 			os.Exit(1)
 		}

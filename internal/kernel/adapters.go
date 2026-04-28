@@ -5,6 +5,7 @@ import (
 
 	"github.com/gavmor/podpedia/internal/types"
 	"github.com/gavmor/wasm-microkernel/host"
+	"github.com/spf13/afero"
 )
 
 // PodpediaKernel is a domain-specific wrapper around the generic host.Kernel.
@@ -41,39 +42,25 @@ func NewTranscriber(pk *PodpediaKernel) *transcriber {
 	return &transcriber{pk: pk}
 }
 
-func (t *transcriber) Transcribe(ep types.Episode) (string, error) {
+func (t *transcriber) Transcribe(ctx context.Context, audioURL string, prompt string) (string, error) {
 	req := struct {
 		AudioURL string `json:"audio_url"`
 		Prompt   string `json:"prompt"`
 	}{
-		AudioURL: ep.AudioURL,
-		Prompt:   asrPrompt(ep),
+		AudioURL: audioURL,
+		Prompt:   prompt,
 	}
 
 	config := map[string]string{
 		"transcribe-url": t.pk.TranscribeURL,
 	}
 
-	res, err := t.pk.Call(context.Background(), "transcriber", req, config)
+	res, err := t.pk.Call(ctx, "transcriber", req, config)
 	if err != nil {
 		return "", err
 	}
 
 	return string(res), nil
-}
-
-// asrPrompt builds an ASR initial prompt from podcast episode metadata.
-// Whisper uses this to bias vocabulary towards proper nouns in the title
-// and description before seeing any audio.
-func asrPrompt(ep types.Episode) string {
-	switch {
-	case ep.Title != "" && ep.Description != "":
-		return ep.Title + "\n\n" + ep.Description
-	case ep.Title != "":
-		return ep.Title
-	default:
-		return ep.Description
-	}
 }
 
 // Extractor adapter
@@ -85,12 +72,12 @@ func NewExtractor(pk *PodpediaKernel) *extractor {
 	return &extractor{pk: pk}
 }
 
-func (e *extractor) ExtractEntities(ep types.Episode, scheme []byte) ([]byte, error) {
+func (e *extractor) ExtractEntities(ctx context.Context, ep *types.Episode, scheme []byte) ([]byte, error) {
 	req := struct {
 		Episode types.Episode `json:"episode"`
 		Scheme  []byte        `json:"scheme"`
 	}{
-		Episode: ep,
+		Episode: *ep,
 		Scheme:  scheme,
 	}
 
@@ -99,7 +86,7 @@ func (e *extractor) ExtractEntities(ep types.Episode, scheme []byte) ([]byte, er
 		"ollama-model": e.pk.OllamaModel,
 	}
 
-	return e.pk.Call(context.Background(), "extractor", req, config)
+	return e.pk.Call(ctx, "extractor", req, config)
 }
 
 // Downloader adapter
@@ -111,7 +98,11 @@ func NewDownloader(pk *PodpediaKernel) *downloader {
 	return &downloader{pk: pk}
 }
 
-func (d *downloader) DownloadAudio(url, dest string) error {
+type downloaderWorkspaceKeyType int
+
+const downloaderWorkspaceKey downloaderWorkspaceKeyType = iota
+
+func (d *downloader) DownloadAudio(ctx context.Context, fs afero.Fs, url, dest string) error {
 	req := struct {
 		URL  string `json:"url"`
 		Dest string `json:"dest"`
@@ -120,7 +111,10 @@ func (d *downloader) DownloadAudio(url, dest string) error {
 		Dest: dest,
 	}
 
-	_, err := d.pk.Call(context.Background(), "downloader", req, nil)
+	// Propagate the workspace through the context
+	ctx = context.WithValue(ctx, downloaderWorkspaceKey, fs)
+
+	_, err := d.pk.Call(ctx, "downloader", req, nil)
 	return err
 }
 
@@ -133,20 +127,27 @@ func NewStore(pk *PodpediaKernel) *store {
 	return &store{pk: pk}
 }
 
-func (s *store) SaveRawData(outputDir string, ep types.Episode) error {
+type storeWorkspaceKeyType int
+
+const storeWorkspaceKey storeWorkspaceKeyType = iota
+
+func (s *store) SaveRawData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode) error {
 	req := struct {
 		OutputDir string        `json:"output_dir"`
 		Episode   types.Episode `json:"episode"`
 	}{
 		OutputDir: outputDir,
-		Episode:   ep,
+		Episode:   *ep,
 	}
 
-	_, err := s.pk.Call(context.Background(), "store", req, nil)
+	// Propagate the workspace through the context
+	ctx = context.WithValue(ctx, storeWorkspaceKey, fs)
+
+	_, err := s.pk.Call(ctx, "store", req, nil)
 	return err
 }
 
-func (s *store) SaveStructuredData(outputDir string, ep types.Episode, entry []byte, schemeID string) error {
+func (s *store) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error {
 	req := struct {
 		OutputDir string        `json:"output_dir"`
 		Episode   types.Episode `json:"episode"`
@@ -154,11 +155,14 @@ func (s *store) SaveStructuredData(outputDir string, ep types.Episode, entry []b
 		SchemeID  string        `json:"scheme_id"`
 	}{
 		OutputDir: outputDir,
-		Episode:   ep,
+		Episode:   *ep,
 		Entry:     entry,
 		SchemeID:  schemeID,
 	}
 
-	_, err := s.pk.Call(context.Background(), "store", req, nil)
+	// Propagate the workspace through the context
+	ctx = context.WithValue(ctx, storeWorkspaceKey, fs)
+
+	_, err := s.pk.Call(ctx, "store", req, nil)
 	return err
 }

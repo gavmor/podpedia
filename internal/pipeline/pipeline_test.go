@@ -1,95 +1,42 @@
 package pipeline_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"code.cloudfoundry.org/lager/v3/lagertest"
 	. "github.com/gavmor/podpedia/internal/pipeline"
-	"github.com/gavmor/podpedia/internal/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/afero"
 )
-
-// Mock implementations for testing
-type mockTranscriber struct{}
-
-func (m *mockTranscriber) Transcribe(ep types.Episode) (string, error) {
-	return GoTimeTranscriptFixture, nil
-}
-
-type mockExtractor struct{}
-
-func (m *mockExtractor) ExtractEntities(ep types.Episode, scheme []byte) ([]byte, error) {
-	return []byte(`{"episode_id": "` + ep.ID + `", "mocked": true}`), nil
-}
-
-type mockDownloader struct{}
-
-func (m *mockDownloader) DownloadAudio(url string, dest string) error {
-	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(dest, []byte("mock audio"), 0644)
-}
-
-type mockStore struct {
-	RawSaved        bool
-	StructuredSaved bool
-	savedStructured map[string][]byte
-}
-
-func (m *mockStore) SaveRawData(outputDir string, ep types.Episode) error {
-	m.RawSaved = true
-	return nil
-}
-
-func (m *mockStore) SaveStructuredData(outputDir string, ep types.Episode, entry []byte, schemeID string) error {
-	m.StructuredSaved = true
-
-	id := ep.ID
-	if id == "" {
-		id = "unknown"
-	}
-
-	key := fmt.Sprintf("%s_%s", testSlug(id), schemeID)
-	m.savedStructured[key] = entry
-	return nil
-}
-
-func testSlug(s string) string {
-	return strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
-			return r
-		}
-		return '_'
-	}, s)
-}
 
 var _ = Describe("Pipeline", func() {
 	var (
 		pipeline *Pipeline
 		logger   *lagertest.TestLogger
 		store    *mockStore
+		fs       afero.Fs
 		outDir   string
 	)
 
 	BeforeEach(func() {
+		fs = afero.NewMemMapFs()
 		logger = lagertest.NewTestLogger("pipeline-test")
 		store = &mockStore{
+			fs:              fs,
 			savedStructured: make(map[string][]byte),
 		}
 		pipeline = NewPipeline(
 			logger,
 			&mockTranscriber{},
 			&mockExtractor{},
-			&mockDownloader{},
+			&mockDownloader{fs: fs},
 			store,
-		)
+		).WithWorkspace(fs)
 		outDir = "test_output_bdd"
 	})
 
@@ -130,7 +77,7 @@ var _ = Describe("Pipeline", func() {
 
 		It("successfully executes all stages of the pipeline", func() {
 			By("running the pipeline")
-			err := pipeline.Run(ts.URL, outDir)
+			err := pipeline.Run(context.Background(), ts.URL, outDir)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying the data was saved")
@@ -147,7 +94,7 @@ var _ = Describe("Pipeline", func() {
 			By("setting a custom scheme")
 			pipeline.WithScheme(scheme, schemeID)
 
-			err := pipeline.Run(ts.URL, outDir)
+			err := pipeline.Run(context.Background(), ts.URL, outDir)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying the specific file was 'saved'")
@@ -164,14 +111,19 @@ var _ = Describe("Pipeline", func() {
 			})
 
 			It("returns an error", func() {
-				err := pipeline.Run(ts.URL, outDir)
+				err := pipeline.Run(context.Background(), ts.URL, outDir)
 				Expect(err).To(HaveOccurred())
 			})
 		})
 
 		Context("when the feed URL is unreachable", func() {
 			It("returns an error", func() {
-				err := pipeline.Run("http://invalid-and-unreachable-url-12345.com", outDir)
+				// Use a closed server to guarantee connection failure
+				badServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+				badURL := badServer.URL
+				badServer.Close()
+
+				err := pipeline.Run(context.Background(), badURL, outDir)
 				Expect(err).To(HaveOccurred())
 			})
 		})
