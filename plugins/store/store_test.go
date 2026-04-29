@@ -53,7 +53,7 @@ var _ = Describe("Store Plugin Logic", func() {
 			_ = os.RemoveAll(tmpDir)
 		})
 
-		It("creates the correct filename", func() {
+		It("creates the correct entry file and meta sidecar", func() {
 			reqJSON, _ := json.Marshal(req)
 
 			resJSON, err := HandleStructured(reqJSON)
@@ -67,6 +67,72 @@ var _ = Describe("Store Plugin Logic", func() {
 
 			Expect(res.Path).To(HaveSuffix("ep_123_my-scheme.json"))
 			Expect(res.Path).To(BeAnExistingFile())
+
+			metaPath := tmpDir + "/ep_123_meta.json"
+			Expect(metaPath).To(BeAnExistingFile())
+			metaBytes, err := os.ReadFile(metaPath)
+			Expect(err).NotTo(HaveOccurred())
+			var meta map[string]string
+			Expect(json.Unmarshal(metaBytes, &meta)).To(Succeed())
+			Expect(meta).To(HaveKey("audio_url"))
+			Expect(meta).To(HaveKey("episode_id"))
+			Expect(meta).To(HaveKey("title"))
+			Expect(meta).To(HaveKey("pub_date"))
+		})
+
+		It("is idempotent — second call skips re-writing the entry", func() {
+			reqJSON, _ := json.Marshal(req)
+
+			_, err := HandleStructured(reqJSON)
+			Expect(err).NotTo(HaveOccurred())
+
+			entryPath := tmpDir + "/ep_123_my-scheme.json"
+			beforeContent, err := os.ReadFile(entryPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Modify the entry data — second call should NOT overwrite
+			req["entry"] = map[string]any{"data": "different data"}
+			reqJSON, _ = json.Marshal(req)
+			_, err = HandleStructured(reqJSON)
+			Expect(err).NotTo(HaveOccurred())
+
+			afterContent, err := os.ReadFile(entryPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(afterContent).To(Equal(beforeContent))
+		})
+
+		It("backfills missing metadata even if the structured entry already exists (without overwriting)", func() {
+			reqJSON, _ := json.Marshal(req)
+
+			// 1. Initial write
+			_, err := HandleStructured(reqJSON)
+			Expect(err).NotTo(HaveOccurred())
+
+			entryPath := tmpDir + "/ep_123_my-scheme.json"
+			beforeContent, err := os.ReadFile(entryPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			metaPath := tmpDir + "/ep_123_meta.json"
+			Expect(metaPath).To(BeAnExistingFile())
+
+			// 2. Delete only the metadata
+			err = os.Remove(metaPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(metaPath).NotTo(BeAnExistingFile())
+
+			// 3. Call again with DIFFERENT entry data - should NOT overwrite entry, but should restore meta
+			req["entry"] = map[string]any{"data": "malicious/accidental overwrite"}
+			reqJSON, _ = json.Marshal(req)
+			_, err = HandleStructured(reqJSON)
+			Expect(err).NotTo(HaveOccurred())
+
+			// 4. Verify meta is back
+			Expect(metaPath).To(BeAnExistingFile())
+
+			// 5. Verify entry was NOT overwritten
+			afterContent, err := os.ReadFile(entryPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(afterContent).To(Equal(beforeContent))
 		})
 
 		Context("with non-alphanumeric characters in the ID", func() {
