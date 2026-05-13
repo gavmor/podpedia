@@ -1,0 +1,24 @@
+goos: linux
+goarch: amd64
+pkg: github.com/gavmor/podpedia/internal/graph
+cpu: AMD Ryzen 7 3700X 8-Core Processor             
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     30176 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     30531 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     35115 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  891354	     36553 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     30216 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     30157 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     30294 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     30144 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     30318 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     32021 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	 1000000	     37505 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  882976	     42196 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  864394	     44414 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  851336	     42152 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  850353	     45312 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  844302	     45601 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  813463	     48059 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  762411	     45333 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	  774464	     50342 ns/op
+BenchmarkGraphSnapshot/memory/scale-100-16         	
