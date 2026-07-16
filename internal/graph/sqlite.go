@@ -145,16 +145,18 @@ func (g *SQLiteGraphDB) GetNeighbors(id string) ([]Node, error) {
 	for rows.Next() {
 		var r neighborRow
 		if err := rows.Scan(&r.id, &r.label); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, fmt.Errorf("scan neighbor: %w", err)
 		}
 		nr = append(nr, r)
 	}
 	if err := rows.Err(); err != nil {
-		rows.Close()
+		_ = rows.Close()
 		return nil, err
 	}
-	rows.Close()
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 
 	// Now load properties in a separate pass
 	var neighbors []Node
@@ -177,7 +179,7 @@ func (g *SQLiteGraphDB) loadProperties(nodeID string) (map[string]string, error)
 	if err != nil {
 		return nil, fmt.Errorf("query properties: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	props := make(map[string]string)
 	for rows.Next() {
@@ -213,16 +215,18 @@ func (g *SQLiteGraphDB) Snapshot() (*GraphSnapshot, error) {
 	for nodeRows.Next() {
 		var r nodeRow
 		if err := nodeRows.Scan(&r.id, &r.label); err != nil {
-			nodeRows.Close()
+			_ = nodeRows.Close()
 			return nil, fmt.Errorf("scan node: %w", err)
 		}
 		nr = append(nr, r)
 	}
 	if err := nodeRows.Err(); err != nil {
-		nodeRows.Close()
+		_ = nodeRows.Close()
 		return nil, err
 	}
-	nodeRows.Close()
+	if err := nodeRows.Close(); err != nil {
+		return nil, err
+	}
 
 	// Load properties for each node in a separate pass
 	var nodes []Node
@@ -248,16 +252,18 @@ func (g *SQLiteGraphDB) Snapshot() (*GraphSnapshot, error) {
 	for edgeRows.Next() {
 		var e Edge
 		if err := edgeRows.Scan(&e.From, &e.To, &e.Label); err != nil {
-			edgeRows.Close()
+			_ = edgeRows.Close()
 			return nil, fmt.Errorf("scan edge: %w", err)
 		}
 		edges = append(edges, e)
 	}
 	if err := edgeRows.Err(); err != nil {
-		edgeRows.Close()
+		_ = edgeRows.Close()
 		return nil, err
 	}
-	edgeRows.Close()
+	if err := edgeRows.Close(); err != nil {
+		return nil, err
+	}
 
 	if nodes == nil {
 		nodes = make([]Node, 0)

@@ -43,8 +43,8 @@ type Entity struct {
 
 // Relationship is a directed edge in the knowledge graph.
 type Relationship struct {
-	Source  string `json:"source"`
-	Target  string `json:"target"`
-	Relation string `json:"relation"` // e.g., FOUNDED_BY, INVESTED_IN
-	Context string `json:"context,omitempty"` // one-sentence justification
+	Source   string `json:"source"`
+	Target   string `json:"target"`
+	Relation string `json:"relation"`          // e.g., FOUNDED_BY, INVESTED_IN
+	Context  string `json:"context,omitempty"` // one-sentence justification
 }
