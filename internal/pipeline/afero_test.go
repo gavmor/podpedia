@@ -22,52 +22,64 @@ func (e *errorTranscriber) Transcribe(ctx context.Context, audioURL string, prom
 
 var _ = Describe("Pipeline with Afero Workspace", func() {
 	var (
-		fs       afero.Fs
-		pipeline *Pipeline
-		logger   *lagertest.TestLogger
+		fs     afero.Fs
+		logger *lagertest.TestLogger
 	)
 
 	BeforeEach(func() {
 		fs = afero.NewMemMapFs()
 		logger = lagertest.NewTestLogger("pipeline-afero-test")
-
-		pipeline = NewPipeline(
-			logger,
-			&mockTranscriber{},
-			&mockExtractor{},
-			&mockDownloader{fs: fs},
-			&mockStore{fs: fs, savedStructured: make(map[string][]byte)},
-		)
 	})
 
-	It("respects the provided workspace for transcription caching", func() {
-		transcriptPath := "test-output-afero/test_ep_1_raw.txt"
-		expectedTranscript := "cached transcript"
-
-		// Pre-populate the memory filesystem
-		Expect(fs.MkdirAll("test-output-afero", 0755)).To(Succeed())
-		Expect(afero.WriteFile(fs, transcriptPath, []byte(expectedTranscript), 0644)).To(Succeed())
-
-		pipeline.WithWorkspace(fs)
-
-		ep := types.Episode{
-			ID: "test-ep-1",
-		}
-
-		// We use a transcriber that returns an error to ensure we're using the cache
-		eTranscriber := &errorTranscriber{err: fmt.Errorf("should not be called")}
-
-		// Re-init pipeline with the error transcriber
-		pipeline = NewPipeline(
+	build := func(t Transcriber) *Pipeline {
+		return NewPipeline(
 			logger,
-			eTranscriber,
+			t,
 			&mockExtractor{},
-			&mockDownloader{fs: fs},
-			&mockStore{fs: fs, savedStructured: make(map[string][]byte)},
-		).WithWorkspace(fs)
+			&countingDownloader{fs: fs},
+			&writingStore{fs: fs},
+		).WithWorkspace(fs).WithScheme([]byte(`{}`), "entry")
+	}
 
-		err := pipeline.ProcessEpisode(context.Background(), &ep, "test-output-afero")
+	It("writes this run's output into the provided workspace", func() {
+		ep := types.Episode{ID: "test-ep-1", AudioURL: "https://example.com/1.mp3"}
+		p := build(&countingTranscriber{transcript: "fresh transcript"})
+
+		Expect(p.ProcessEpisode(context.Background(), &ep, "test-output-afero")).To(Succeed())
+
+		content, err := afero.ReadFile(fs, "test-output-afero/test_ep_1_raw.txt")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ep.Transcript).To(Equal(expectedTranscript))
+		Expect(string(content)).To(Equal("fresh transcript"))
+	})
+
+	// The workspace is a scratch directory the caller owns: it may arrive
+	// empty on every run and be deleted afterwards, so what it happens to
+	// contain is not evidence that the work was already done. Reuse lives in
+	// the engine's own store instead (see WithCache), keyed by enclosure URL.
+	It("does not treat workspace contents as a cache", func() {
+		transcriptPath := "test-output-afero/test_ep_1_raw.txt"
+		Expect(fs.MkdirAll("test-output-afero", 0o755)).To(Succeed())
+		Expect(afero.WriteFile(fs, transcriptPath, []byte("stale transcript"), 0o644)).To(Succeed())
+
+		transcriber := &countingTranscriber{transcript: "fresh transcript"}
+		ep := types.Episode{ID: "test-ep-1", AudioURL: "https://example.com/1.mp3"}
+
+		Expect(build(transcriber).ProcessEpisode(context.Background(), &ep, "test-output-afero")).To(Succeed())
+
+		Expect(transcriber.calls).To(Equal(1), "a stale file must not stand in for the ASR stage")
+		Expect(ep.Transcript).To(Equal("fresh transcript"))
+
+		content, err := afero.ReadFile(fs, transcriptPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(content)).To(Equal("fresh transcript"))
+	})
+
+	It("surfaces a transcription failure", func() {
+		ep := types.Episode{ID: "test-ep-1", AudioURL: "https://example.com/1.mp3"}
+
+		err := build(&errorTranscriber{err: fmt.Errorf("asr unavailable")}).
+			ProcessEpisode(context.Background(), &ep, "test-output-afero")
+
+		Expect(err).To(MatchError(ContainSubstring("asr unavailable")))
 	})
 })

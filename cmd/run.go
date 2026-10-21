@@ -25,6 +25,8 @@ var (
 	transcribeURL string
 	episodeLimit  int
 	outputScheme  string
+	cacheDir      string
+	cacheMaxBytes int64
 )
 
 var runCmd = &cobra.Command{
@@ -63,6 +65,16 @@ Each stage is a sandboxed WASM plugin. Uses embedded defaults unless --plugins i
 
 		if episodeLimit > 0 {
 			opts = append(opts, podpedia.WithLimit(episodeLimit))
+		}
+
+		// Only forward the cache flags when they were actually given, so an
+		// unset flag still falls through to PODPEDIA_CACHE_DIR and the
+		// engine's own defaults.
+		if cmd.Flags().Changed("cache-dir") {
+			opts = append(opts, podpedia.WithCacheDir(cacheDir))
+		}
+		if cmd.Flags().Changed("cache-max-bytes") {
+			opts = append(opts, podpedia.WithCacheMaxBytes(cacheMaxBytes))
 		}
 
 		if outputScheme != "" {
@@ -152,6 +164,8 @@ func init() {
 	runCmd.Flags().StringVar(&transcribeURL, "transcribe-url", "", "ASR endpoint URL for transcription (Whisper.cpp, Deepgram, etc.)")
 	runCmd.Flags().IntVarP(&episodeLimit, "limit", "n", 0, "Maximum number of episodes to process (0 = all)")
 	runCmd.Flags().StringVar(&outputScheme, "output-scheme", "", "Path to a JSON file defining the structured output schema")
+	runCmd.Flags().StringVar(&cacheDir, "cache-dir", "", "Directory for the engine's persistent artifact cache; empty disables it (default: $PODPEDIA_CACHE_DIR, else the user cache directory)")
+	runCmd.Flags().Int64Var(&cacheMaxBytes, "cache-max-bytes", podpedia.DefaultCacheMaxBytes, "Total size budget for the artifact cache; least-recently-used entries are evicted past it")
 	if err := runCmd.MarkFlagRequired("url"); err != nil {
 		panic(err)
 	}

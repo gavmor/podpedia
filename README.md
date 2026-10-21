@@ -53,6 +53,38 @@ make plugins
 | `--ollama-model` | | `qwen2.5:0.5b` | Ollama model to use for extraction |
 | `--output-scheme` | | *(none)* | Path to a JSON file defining the extraction schema |
 | `--transcribe-url` | | *(none)* | ASR endpoint for transcription (Whisper.cpp, Deepgram, etc.) |
+| `--cache-dir` | | *(see below)* | Directory for the persistent artifact cache; empty disables it |
+| `--cache-max-bytes` | | `268435456` (256 MiB) | Total size budget for the artifact cache |
+
+### Artifact cache
+
+Transcription and extraction are the expensive stages, so the engine keeps
+their results in a persistent cache and reuses them on a later run.
+
+The cache is **not** the `--output` directory. That directory is a scratch
+workspace: a caller is free to hand the engine an empty one for every job and
+delete it afterwards, so what it contains is no evidence of prior work. The
+cache lives somewhere the engine owns and nothing else clears:
+
+| Setting | Resolution order |
+|---|---|
+| Location | `--cache-dir`, then `$PODPEDIA_CACHE_DIR`, then `<user cache dir>/podpedia/artifacts`. An empty value turns caching off. |
+| Size budget | `--cache-max-bytes`, then `$PODPEDIA_CACHE_MAX_BYTES`, then 256 MiB. |
+
+Entries are keyed by a SHA-256 of the episode's **audio enclosure URL** — not
+its title or `<guid>`, so re-titling an episode or regenerating its `<guid>`
+does not cost a cache miss. The extraction scheme is folded into the key for
+structured output, so a different `--output-scheme` is a different entry.
+
+**Eviction policy:** once a write pushes the directory past its budget,
+entries are deleted least-recently-used first (a read refreshes an entry's
+recency) until it fits again. A value larger than the whole budget is refused
+rather than stored. The cache is an optimisation only: a failure to read,
+write or open it is logged and the run continues by recomputing.
+
+A cache hit still writes the episode's files into `--output`, so a caller that
+harvests that directory sees the same result whether the work was computed or
+recalled.
 
 ### Configurable Structured Extraction
 

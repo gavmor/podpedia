@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"runtime"
@@ -34,6 +36,25 @@ type Store interface {
 	SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error
 }
 
+// ArtifactCache is a persistent store for the expensive outputs of a run —
+// ASR transcripts and LLM extractions. Keys are opaque strings (see
+// episodeCacheKey); values are bytes.
+//
+// It is deliberately NOT the workspace. The workspace is scratch: a caller is
+// entitled to hand over an empty directory for every run and delete it
+// afterwards, so the presence or absence of a file there says nothing about
+// whether the work has been done before. A cache implementation lives
+// somewhere the engine owns and that survives runs.
+//
+// A nil cache disables caching; every lookup then misses and every stage runs.
+type ArtifactCache interface {
+	// Get returns the value for key; the boolean reports a hit. A failure to
+	// read is reported as a miss, since recomputing is the only response.
+	Get(key string) ([]byte, bool)
+	// Put stores data under key.
+	Put(key string, data []byte) error
+}
+
 // Pipeline coordinates the end-to-end processing of a podcast feed.
 type Pipeline struct {
 	logger            lager.Logger
@@ -41,6 +62,7 @@ type Pipeline struct {
 	extractor         Extractor
 	downloader        AudioDownloader
 	store             Store
+	cache             ArtifactCache
 	Workspace         afero.Fs
 	onEpisodeComplete func(ep types.Episode, err error)
 	maxWorkers        int
@@ -77,6 +99,13 @@ func (p *Pipeline) WithWorkspace(fs afero.Fs) *Pipeline {
 	if fs != nil {
 		p.Workspace = fs
 	}
+	return p
+}
+
+// WithCache attaches the persistent artifact cache consulted around the
+// transcription and extraction stages. A nil cache leaves caching off.
+func (p *Pipeline) WithCache(c ArtifactCache) *Pipeline {
+	p.cache = c
 	return p
 }
 
@@ -159,6 +188,14 @@ func (p *Pipeline) ProcessEpisode(ctx context.Context, ep *types.Episode, output
 }
 
 // processEpisode handles the full processing lifecycle of a single episode.
+//
+// Every expensive stage is guarded by the engine's persistent cache, keyed by
+// the episode's enclosure URL. The workspace is treated purely as this run's
+// output directory: it is never read to decide whether work can be skipped,
+// because the caller owns it and may legitimately supply an empty one each
+// time. Consequently a cache hit still materialises the episode's files in
+// the workspace, so a caller that harvests the directory sees the same result
+// whether the work was computed or recalled.
 func (p *Pipeline) processEpisode(ctx context.Context, ep *types.Episode, outputDir string) error {
 	id := ep.ID
 	if id == "" {
@@ -173,44 +210,23 @@ func (p *Pipeline) processEpisode(ctx context.Context, ep *types.Episode, output
 		return ctx.Err()
 	}
 
-	// --- Idempotency Check ---
-	// Skip if both the final structured data and metadata sidecar already exist.
-	structuredPath := fmt.Sprintf("%s/%s", outputDir, naming.StructuredName(id, p.schemeID))
-	metaPath := fmt.Sprintf("%s/%s", outputDir, naming.MetaName(id))
+	transcriptKey := episodeCacheKey("transcript", ep.AudioURL)
 
-	if _, err := p.Workspace.Stat(structuredPath); err == nil {
-		if _, err := p.Workspace.Stat(metaPath); err == nil {
-			lsess.Info("skipping-already-processed")
-			return nil
-		}
-	}
-	// --- End Idempotency Check ---
-
-	// Transcribe if needed
-	transcriptPath := fmt.Sprintf("%s/%s", outputDir, naming.RawName(id))
-	if _, err := p.Workspace.Stat(transcriptPath); err == nil {
-		lsess.Info("transcript-already-exists-loading")
-		content, err := afero.ReadFile(p.Workspace, transcriptPath)
-		if err == nil {
-			ep.Transcript = string(content)
-		} else {
-			lsess.Error("failed-read-existing-transcript", err)
-			return fmt.Errorf("failed to read existing transcript: %w", err)
+	// --- Transcription ---
+	if ep.Transcript == "" {
+		if cached, ok := p.cacheGet(transcriptKey); ok {
+			lsess.Info("cache-hit-transcript", lager.Data{"bytes": len(cached)})
+			ep.Transcript = string(cached)
 		}
 	}
 
 	if ep.Transcript == "" {
-		// Download audio only if we actually need to transcribe
+		// Download audio only if we actually need to transcribe.
 		audioPath := fmt.Sprintf("%s/%s", outputDir, naming.AudioName(id))
-		exists, _ := afero.Exists(p.Workspace, audioPath)
-		if exists {
-			lsess.Info("audio-already-exists-skipping-download")
-		} else {
-			lsess.Info("downloading-audio")
-			if err := p.downloader.DownloadAudio(ctx, p.Workspace, ep.AudioURL, audioPath); err != nil {
-				lsess.Error("failed-download", err)
-				return fmt.Errorf("failed to download audio: %w", err)
-			}
+		lsess.Info("downloading-audio")
+		if err := p.downloader.DownloadAudio(ctx, p.Workspace, ep.AudioURL, audioPath); err != nil {
+			lsess.Error("failed-download", err)
+			return fmt.Errorf("failed to download audio: %w", err)
 		}
 
 		lsess.Info("transcribing")
@@ -221,19 +237,33 @@ func (p *Pipeline) processEpisode(ctx context.Context, ep *types.Episode, output
 			return fmt.Errorf("failed transcription: %w", err)
 		}
 		ep.Transcript = transcript
-
-		// Save raw data immediately after transcription
-		if err := p.store.SaveRawData(ctx, p.Workspace, outputDir, ep); err != nil {
-			lsess.Error("failed-save-raw", err)
-			return fmt.Errorf("failed to save raw data: %w", err)
-		}
+		p.cachePut(lsess, transcriptKey, []byte(transcript))
 	}
 
-	lsess.Info("extracting-entities")
-	entry, err := p.extractor.ExtractEntities(ctx, ep, p.outputScheme)
-	if err != nil {
-		lsess.Error("failed-extraction", err)
-		return fmt.Errorf("failed extraction: %w", err)
+	// Write the transcript into this run's output directory, whether it was
+	// just produced or recalled from the cache.
+	if err := p.store.SaveRawData(ctx, p.Workspace, outputDir, ep); err != nil {
+		lsess.Error("failed-save-raw", err)
+		return fmt.Errorf("failed to save raw data: %w", err)
+	}
+
+	// --- Extraction ---
+	// The scheme decides the shape of the answer, so it is part of the key:
+	// the same episode under a different scheme is a different artifact.
+	entryKey := episodeCacheKey("entry", ep.AudioURL, p.schemeID, string(p.outputScheme))
+
+	entry, ok := p.cacheGet(entryKey)
+	if ok {
+		lsess.Info("cache-hit-entry", lager.Data{"bytes": len(entry)})
+	} else {
+		lsess.Info("extracting-entities")
+		var err error
+		entry, err = p.extractor.ExtractEntities(ctx, ep, p.outputScheme)
+		if err != nil {
+			lsess.Error("failed-extraction", err)
+			return fmt.Errorf("failed extraction: %w", err)
+		}
+		p.cachePut(lsess, entryKey, entry)
 	}
 
 	if err := p.store.SaveStructuredData(ctx, p.Workspace, outputDir, ep, entry, p.schemeID); err != nil {
@@ -243,6 +273,51 @@ func (p *Pipeline) processEpisode(ctx context.Context, ep *types.Episode, output
 
 	lsess.Info("completed")
 	return nil
+}
+
+// episodeCacheKey derives a cache key from an episode's enclosure URL.
+//
+// The URL is the episode's stable identity: a publisher re-titling an episode
+// or regenerating its <guid> leaves the audio it points at — and therefore the
+// transcript and the extraction — unchanged, so neither should cost a miss.
+// This is deliberately not naming.Slug: that is the filename contract for a
+// workspace, derived from the identifier, and it is exactly the brittle key
+// the cache must avoid. The key is a hash, so it is safe as a filename or an
+// object key regardless of what the URL contains, and further discriminators
+// (an extraction scheme, say) fold in without needing a quoting scheme.
+//
+// An episode with no enclosure URL has no stable identity, so it is reported
+// as uncacheable and every stage runs for it.
+func episodeCacheKey(kind string, audioURL string, extra ...string) string {
+	if audioURL == "" {
+		return ""
+	}
+	h := sha256.New()
+	for _, part := range append([]string{audioURL}, extra...) {
+		_, _ = h.Write([]byte(part))
+		_, _ = h.Write([]byte{0}) // unambiguous separator
+	}
+	return kind + "-" + hex.EncodeToString(h.Sum(nil))
+}
+
+// cacheGet reads key, treating a disabled cache or an unusable key as a miss.
+func (p *Pipeline) cacheGet(key string) ([]byte, bool) {
+	if p.cache == nil || key == "" {
+		return nil, false
+	}
+	return p.cache.Get(key)
+}
+
+// cachePut stores data under key. A cache write failure is logged and
+// swallowed: the run already has the value in hand, and the only cost is that
+// the next run recomputes it.
+func (p *Pipeline) cachePut(lsess lager.Logger, key string, data []byte) {
+	if p.cache == nil || key == "" {
+		return
+	}
+	if err := p.cache.Put(key, data); err != nil {
+		lsess.Error("failed-cache-write", err, lager.Data{"key": key})
+	}
 }
 
 // generateTranscriptionHint builds an ASR initial prompt from podcast episode metadata.
