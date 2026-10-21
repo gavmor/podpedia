@@ -9,19 +9,6 @@ import (
 )
 
 var _ = Describe("Store Plugin Logic", func() {
-	Describe("slug", func() {
-		DescribeTable("slugification cases",
-			func(input, expected string) {
-				Expect(slug(input)).To(Equal(expected))
-			},
-			Entry("alphanumeric pass-through", "hello", "hello"),
-			Entry("mixed case and numbers", "Hello123", "Hello123"),
-			Entry("hyphen to underscore", "abc-def", "abc_def"),
-			Entry("all caps", "ABC", "ABC"),
-			Entry("non-alphanumeric to underscore", "http://id/123", "http___id_123"),
-		)
-	})
-
 	Describe("HandleStructured", func() {
 		var (
 			tmpDir  string

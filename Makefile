@@ -38,7 +38,7 @@ plugins-build:
 
 ## Run host unit tests (no WASM build needed)
 test:
-	$(GO) test ./internal/...
+	$(GO) test ./internal/... ./pkg/...
 
 ## Run unit tests for all plugin logic (no WASM build needed)
 test-plugins:

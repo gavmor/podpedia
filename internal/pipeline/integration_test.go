@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/gavmor/podpedia/internal/kernel"
-	. "github.com/gavmor/podpedia/internal/pipeline"
 	"github.com/gavmor/podpedia/internal/types"
+	"github.com/gavmor/podpedia/pkg/naming"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -63,7 +63,7 @@ var _ = Describe("Ollama Integration", func() {
 		}
 
 		// Save the transcript to the output dir to simulate processEpisode behavior
-		transcriptPath := filepath.Join(outputDir, Slug(ep.ID)+"_raw.txt")
+		transcriptPath := filepath.Join(outputDir, naming.RawName(ep.ID))
 		err := os.WriteFile(transcriptPath, []byte(ep.Transcript), 0644)
 		Expect(err).NotTo(HaveOccurred())
 

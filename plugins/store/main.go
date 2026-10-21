@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavmor/podpedia/internal/types"
+	"github.com/gavmor/podpedia/pkg/naming"
 	"github.com/gavmor/wasm-microkernel/guest"
 	"github.com/samber/lo"
 )
@@ -36,7 +37,7 @@ func HandleRaw(in []byte) (string, error) {
 	if err := json.Unmarshal(in, &req); err != nil {
 		return "", err
 	}
-	path := fmt.Sprintf("%s/%s_raw.txt", req.OutputDir, slug(req.Episode.ID))
+	path := fmt.Sprintf("%s/%s", req.OutputDir, naming.RawName(req.Episode.ID))
 	content, _ := lo.Coalesce(req.Episode.Transcript, fmt.Sprintf("# %s\n\n(no transcript)\n", req.Episode.Title))
 
 	if err := atomicWrite(path, []byte(content)); err != nil {
@@ -64,11 +65,10 @@ func HandleStructured(in []byte) (string, error) {
 	if id == "" {
 		id = req.Episode.AudioURL
 	}
-	entryID := slug(id)
 
 	// Idempotency: skip only if both the structured entry and meta sidecar exist
-	structuredPath := fmt.Sprintf("%s/%s_%s.json", req.OutputDir, entryID, req.SchemeID)
-	metaPath := fmt.Sprintf("%s/%s_meta.json", req.OutputDir, entryID)
+	structuredPath := fmt.Sprintf("%s/%s", req.OutputDir, naming.StructuredName(id, req.SchemeID))
+	metaPath := fmt.Sprintf("%s/%s", req.OutputDir, naming.MetaName(id))
 
 	structuredExists := false
 	if _, err := os.Stat(structuredPath); err == nil {
@@ -169,7 +169,7 @@ func atomicWrite(path string, content []byte) error {
 	return nil
 }
 
-// The slug function is now in logic.go.
+// The slug/filename contract lives in github.com/gavmor/podpedia/pkg/naming.
 
 func main() {}
 

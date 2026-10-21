@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	. "github.com/gavmor/podpedia/internal/pipeline"
 	"github.com/gavmor/podpedia/internal/types"
+	"github.com/gavmor/podpedia/pkg/naming"
 	"github.com/spf13/afero"
 )
 
@@ -60,8 +60,8 @@ func (m *mockStore) SaveStructuredData(ctx context.Context, fs afero.Fs, outputD
 		id = "unknown"
 	}
 
-	// Using the real slug helper from the pipeline package via dot-import
-	key := fmt.Sprintf("%s_%s", Slug(id), schemeID)
+	// Use the published naming contract rather than a second copy of it.
+	key := fmt.Sprintf("%s_%s", naming.Slug(id), schemeID)
 	m.savedStructured[key] = entry
 	return nil
 }

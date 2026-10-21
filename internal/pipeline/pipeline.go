@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
 	"code.cloudfoundry.org/lager/v3"
 	"github.com/alitto/pond"
 	"github.com/gavmor/podpedia/internal/types"
+	"github.com/gavmor/podpedia/pkg/naming"
 	"github.com/mmcdole/gofeed"
 	"github.com/spf13/afero"
 )
@@ -175,9 +175,8 @@ func (p *Pipeline) processEpisode(ctx context.Context, ep *types.Episode, output
 
 	// --- Idempotency Check ---
 	// Skip if both the final structured data and metadata sidecar already exist.
-	entryID := slug(id)
-	structuredPath := fmt.Sprintf("%s/%s_%s.json", outputDir, entryID, p.schemeID)
-	metaPath := fmt.Sprintf("%s/%s_meta.json", outputDir, entryID)
+	structuredPath := fmt.Sprintf("%s/%s", outputDir, naming.StructuredName(id, p.schemeID))
+	metaPath := fmt.Sprintf("%s/%s", outputDir, naming.MetaName(id))
 
 	if _, err := p.Workspace.Stat(structuredPath); err == nil {
 		if _, err := p.Workspace.Stat(metaPath); err == nil {
@@ -188,7 +187,7 @@ func (p *Pipeline) processEpisode(ctx context.Context, ep *types.Episode, output
 	// --- End Idempotency Check ---
 
 	// Transcribe if needed
-	transcriptPath := fmt.Sprintf("%s/%s_raw.txt", outputDir, entryID)
+	transcriptPath := fmt.Sprintf("%s/%s", outputDir, naming.RawName(id))
 	if _, err := p.Workspace.Stat(transcriptPath); err == nil {
 		lsess.Info("transcript-already-exists-loading")
 		content, err := afero.ReadFile(p.Workspace, transcriptPath)
@@ -202,7 +201,7 @@ func (p *Pipeline) processEpisode(ctx context.Context, ep *types.Episode, output
 
 	if ep.Transcript == "" {
 		// Download audio only if we actually need to transcribe
-		audioPath := fmt.Sprintf("%s/%s.mp3", outputDir, entryID)
+		audioPath := fmt.Sprintf("%s/%s", outputDir, naming.AudioName(id))
 		exists, _ := afero.Exists(p.Workspace, audioPath)
 		if exists {
 			lsess.Info("audio-already-exists-skipping-download")
@@ -331,22 +330,4 @@ func ParseRSSWithGofeed(ctx context.Context, url string) (types.Podcast, []types
 	}
 
 	return podcast, episodes, nil
-}
-
-// slug normalizes a string for use in filenames by keeping only alphanumeric characters.
-func slug(s string) string {
-	if s == "" {
-		return "unknown"
-	}
-	return strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
-			return r
-		}
-		return '_'
-	}, s)
-}
-
-// Slug normalizes a string for use in filenames by keeping only alphanumeric characters.
-func Slug(s string) string {
-	return slug(s)
 }
