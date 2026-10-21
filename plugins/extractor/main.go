@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gavmor/podpedia/internal/types"
 	"github.com/gavmor/wasm-microkernel/guest"
 	"github.com/rozoomcool/go-ollama-sdk"
 	"github.com/samber/lo"
@@ -42,10 +41,7 @@ func (e *extismRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 
 func init() {
 	guest.Register(func(reqJSON string) (string, error) {
-		var req struct {
-			Episode types.Episode   `json:"episode"`
-			Scheme  json.RawMessage `json:"scheme"`
-		}
+		var req extractRequest
 		if err := json.Unmarshal([]byte(reqJSON), &req); err != nil {
 			return "", err
 		}

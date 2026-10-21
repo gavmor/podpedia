@@ -4,7 +4,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/gavmor/podpedia/internal/types"
 )
+
+// extractRequest is the wire contract with the host: it must stay
+// structurally identical to the anonymous struct that
+// internal/kernel.(*extractor).ExtractEntities marshals.
+//
+// types.Episode is resolved through the `replace github.com/gavmor/podpedia
+// => ../..` in go.mod, so it is the same struct definition the host encodes
+// with. Without that replace this module compiled against a published zip
+// whose Episode carried no json tags, and the host's underscored keys
+// (audio_url, pub_date) bound to nothing — Go's default field matching is
+// case-insensitive but does not cross underscores.
+type extractRequest struct {
+	Episode types.Episode   `json:"episode"`
+	Scheme  json.RawMessage `json:"scheme"`
+}
 
 func buildPrompt(title, content string, scheme json.RawMessage) string {
 	schemaStr := string(scheme)

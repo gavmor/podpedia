@@ -31,3 +31,5 @@ require (
 )
 
 replace github.com/rozoomcool/go-ollama-sdk => ../../internal/sdk/go-ollama-sdk
+
+replace github.com/gavmor/podpedia => ../..
