@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gavmor/podpedia/internal/types"
 	"github.com/gavmor/wasm-microkernel/host"
@@ -72,14 +73,26 @@ func NewExtractor(pk *PodpediaKernel) *extractor {
 	return &extractor{pk: pk}
 }
 
-func (e *extractor) ExtractEntities(ctx context.Context, ep *types.Episode, scheme []byte) ([]byte, error) {
-	req := struct {
-		Episode types.Episode `json:"episode"`
-		Scheme  []byte        `json:"scheme"`
-	}{
-		Episode: *ep,
-		Scheme:  scheme,
-	}
+// extractRequest is the wire contract with plugins/extractor; it has to stay
+// structurally identical to that module's own extractRequest.
+//
+// Scheme is json.RawMessage rather than []byte deliberately. encoding/json
+// renders a []byte as a base64 *string*, so a scheme of `{}` left the host as
+// `"scheme":"e30="` and the plugin — which decodes into json.RawMessage and
+// pastes the result straight into the LLM prompt — told the model its output
+// schema was the six characters e30=. internal/protocol.ExtractRequest has
+// always declared the field correctly; this struct had drifted from it.
+type extractRequest struct {
+	Episode types.Episode   `json:"episode"`
+	Scheme  json.RawMessage `json:"scheme"`
+}
+
+func newExtractRequest(ep *types.Episode, scheme json.RawMessage) extractRequest {
+	return extractRequest{Episode: *ep, Scheme: scheme}
+}
+
+func (e *extractor) ExtractEntities(ctx context.Context, ep *types.Episode, scheme json.RawMessage) ([]byte, error) {
+	req := newExtractRequest(ep, scheme)
 
 	config := map[string]string{
 		"ollama-url":   e.pk.OllamaURL,
@@ -147,6 +160,16 @@ func (s *store) SaveRawData(ctx context.Context, fs afero.Fs, outputDir string, 
 	return err
 }
 
+// SaveStructuredData hands the extractor's output to plugins/store.
+//
+// Entry is still []byte, and so still reaches the plugin base64-encoded as a
+// JSON string — the same defect this file's extractRequest just lost, in the
+// other direction. It is left alone on purpose: plugins/store writes that
+// value verbatim to <slug>_<scheme>.json, so retyping it to json.RawMessage
+// turns that file from an unparseable string into a real object and makes
+// podpedia-app's PodcastSource.readEntryGraph start populating Document.Graph
+// where it has always returned nil. That is a product change, not a wire fix,
+// and it is the decision parked on podpedia-app card t_298a9c7e.
 func (s *store) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error {
 	req := struct {
 		OutputDir string        `json:"output_dir"`

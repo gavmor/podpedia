@@ -93,6 +93,15 @@ func WithLimit(limit int) Option {
 	}
 }
 
+// WithScheme sets the JSON structure the extractor should fill in, and the id
+// that names the structured output file for it (see naming.StructuredName —
+// id "entry" yields <slug>_entry.json).
+//
+// A nil or empty scheme with a non-empty id is a supported combination: it
+// names the output without dictating a schema, leaving the extractor plugin
+// to use its own default. Do not pass a placeholder such as []byte(`{}`) to
+// get at the filename — that is a schema as far as the extractor is
+// concerned, and it is what the model will be told to produce.
 func WithScheme(scheme []byte, id string) Option {
 	return func(c *config) {
 		c.outputScheme = scheme
@@ -166,7 +175,10 @@ func NewApp(opts ...Option) (*App, error) {
 		p.WithLimit(c.episodeLimit)
 	}
 
-	if len(c.outputScheme) > 0 {
+	// A scheme id with no scheme is meaningful — it names the structured
+	// output file and lets the extractor plugin pick its own schema — so
+	// the id alone is enough to forward.
+	if len(c.outputScheme) > 0 || c.schemeID != "" {
 		p.WithScheme(c.outputScheme, c.schemeID)
 	}
 

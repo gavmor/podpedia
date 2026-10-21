@@ -25,6 +25,70 @@ const hostRequestJSON = `{"episode":{` +
 	`"transcript":"The transcript body."` +
 	`},"scheme":null}`
 
+// hostRequestWithSchemeJSON is the same envelope with an extraction scheme
+// supplied by the caller.
+//
+// It is duplicated, byte for byte, as goldenExtractRequest in the engine's
+// internal/kernel/extract_request_test.go. The host is a different Go module,
+// so there is no shared type both sides can assert against; a golden literal
+// on each side turns a wire-format drift into two failing tests instead of a
+// silent runtime divergence.
+const hostRequestWithSchemeJSON = `{"episode":{` +
+	`"id":"fx-ep-02",` +
+	`"title":"Fixture Episode Two",` +
+	`"audio_url":"https://example.test/fx-ep-02.mp3",` +
+	`"pub_date":"Mon, 20 Oct 2026 09:00:00 +0000",` +
+	`"description":"A short description.",` +
+	`"author":"Fixture Author",` +
+	`"duration":"00:12:34",` +
+	`"explicit":true,` +
+	`"categories":["Technology"],` +
+	`"transcript":"Welcome to Fixture Cast."` +
+	`},"scheme":{"guests":[{"name":""}]}}`
+
+// base64SchemeRequestJSON is what the host sent before the engine's
+// extractRequest stopped typing Scheme as []byte: encoding/json renders a
+// []byte as a base64 string, so a scheme of `{}` arrived here as the
+// seven-byte literal `"e30="` and was pasted into the LLM prompt as the
+// model's output schema.
+//
+// A host pinned to an engine older than that fix still sends this shape, so
+// the plugin has to survive it rather than merely stop provoking it.
+const base64SchemeRequestJSON = `{"episode":{"id":"fx-ep-02","title":"Fixture Episode Two",` +
+	`"transcript":"Welcome to Fixture Cast."},"scheme":"e30="}`
+
+var _ = Describe("the scheme the host sends", func() {
+	It("reaches the prompt as the JSON object the host sent", func() {
+		var req extractRequest
+		Expect(json.Unmarshal([]byte(hostRequestWithSchemeJSON), &req)).To(Succeed())
+		Expect(string(req.Scheme)).To(Equal(`{"guests":[{"name":""}]}`),
+			"the scheme arrived encoded rather than as JSON — check the host's extractRequest still types it json.RawMessage")
+
+		prompt := buildPrompt(req.Episode.Title, req.Episode.Transcript, req.Scheme)
+		Expect(prompt).To(ContainSubstring(`{"guests":[{"name":""}]}`))
+		Expect(prompt).NotTo(ContainSubstring(defaultScheme))
+	})
+
+	It("falls back to this plugin's own schema when the host sends none", func() {
+		var req extractRequest
+		Expect(json.Unmarshal([]byte(hostRequestJSON), &req)).To(Succeed())
+
+		prompt := buildPrompt(req.Episode.Title, req.Episode.Transcript, req.Scheme)
+		Expect(prompt).To(ContainSubstring(defaultScheme))
+	})
+
+	It("refuses a scheme that is a JSON string instead of prompting with it", func() {
+		var req extractRequest
+		Expect(json.Unmarshal([]byte(base64SchemeRequestJSON), &req)).To(Succeed())
+		Expect(string(req.Scheme)).To(Equal(`"e30="`), "fixture no longer reproduces the defect")
+
+		prompt := buildPrompt(req.Episode.Title, req.Episode.Transcript, req.Scheme)
+		Expect(prompt).NotTo(ContainSubstring("e30="),
+			"a base64 blob was handed to the model as its output schema")
+		Expect(prompt).To(ContainSubstring(defaultScheme))
+	})
+})
+
 var _ = Describe("extractRequest", func() {
 	Describe("decoding the host's episode envelope", func() {
 		var req extractRequest

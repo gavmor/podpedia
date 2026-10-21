@@ -2,6 +2,7 @@ package pipeline_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -19,7 +20,7 @@ func (m *mockTranscriber) Transcribe(ctx context.Context, audioURL string, promp
 
 type mockExtractor struct{}
 
-func (m *mockExtractor) ExtractEntities(ctx context.Context, ep *types.Episode, scheme []byte) ([]byte, error) {
+func (m *mockExtractor) ExtractEntities(ctx context.Context, ep *types.Episode, scheme json.RawMessage) ([]byte, error) {
 	return []byte(`{"episode_id": "` + ep.ID + `", "mocked": true}`), nil
 }
 

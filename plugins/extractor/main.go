@@ -64,9 +64,11 @@ func init() {
 			ollamaModel = "qwen2.5:0.5b"
 		}
 
-		schemaStr := string(req.Scheme)
-		if schemaStr == "" || schemaStr == "null" {
-			schemaStr = `{"guests":[{"name":"","background":"","ideology":""}],"companies":[{"name":"","business_model":"","customers":""}]}`
+		if _, rejected := resolveScheme(req.Scheme); rejected {
+			// Loud rather than silent: the host sent something in the scheme
+			// field that cannot be a schema, so the extraction that follows
+			// is not the one the caller asked for.
+			guest.LogMsg("ignoring unusable scheme, falling back to the plugin default: " + string(req.Scheme))
 		}
 
 		client := ollama.NewClient(ollamaURL)
@@ -81,7 +83,7 @@ func init() {
 			},
 			{
 				Role:    "user",
-				Content: fmt.Sprintf("Extract data from this podcast episode.\n\nSchema:\n%s\n\nTitle: %s\nContent: %s", schemaStr, ep.Title, content),
+				Content: buildPrompt(ep.Title, content, req.Scheme),
 			},
 		}
 

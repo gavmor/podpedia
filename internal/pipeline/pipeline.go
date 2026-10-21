@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -24,7 +25,13 @@ type Transcriber interface {
 }
 
 type Extractor interface {
-	ExtractEntities(ctx context.Context, ep *types.Episode, scheme []byte) ([]byte, error)
+	// ExtractEntities asks the extractor for structured data about ep.
+	//
+	// scheme is json.RawMessage, not []byte: it is embedded in the request
+	// the host marshals for the plugin, and encoding/json renders a []byte
+	// as a base64 string. Typed as []byte, a scheme of `{}` reached the
+	// plugin as the literal `"e30="`.
+	ExtractEntities(ctx context.Context, ep *types.Episode, scheme json.RawMessage) ([]byte, error)
 }
 
 type AudioDownloader interface {
@@ -67,7 +74,7 @@ type Pipeline struct {
 	onEpisodeComplete func(ep types.Episode, err error)
 	maxWorkers        int
 	limit             int
-	outputScheme      []byte
+	outputScheme      json.RawMessage
 	schemeID          string
 }
 
@@ -116,7 +123,14 @@ func (p *Pipeline) WithLimit(n int) *Pipeline {
 }
 
 // WithScheme sets the extraction scheme for the pipeline.
-func (p *Pipeline) WithScheme(scheme []byte, id string) *Pipeline {
+//
+// A nil or empty scheme with a non-empty id is meaningful: it names the
+// structured output file (see naming.StructuredName) without dictating a
+// schema, leaving the extractor plugin to use its own. Do not substitute a
+// placeholder like `{}` to get the filename — the plugin cannot tell that
+// apart from a caller who genuinely wants an empty object extracted, and it
+// will prompt the model with it.
+func (p *Pipeline) WithScheme(scheme json.RawMessage, id string) *Pipeline {
 	p.outputScheme = scheme
 	p.schemeID = id
 	return p

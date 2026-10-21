@@ -2,6 +2,7 @@ package pipeline_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -64,7 +65,7 @@ type countingExtractor struct {
 	calls int
 }
 
-func (e *countingExtractor) ExtractEntities(ctx context.Context, ep *types.Episode, scheme []byte) ([]byte, error) {
+func (e *countingExtractor) ExtractEntities(ctx context.Context, ep *types.Episode, scheme json.RawMessage) ([]byte, error) {
 	e.calls++
 	return []byte(fmt.Sprintf(`{"episode_id":%q,"scheme":%q}`, ep.ID, string(scheme))), nil
 }
