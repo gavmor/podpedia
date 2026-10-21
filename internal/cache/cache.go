@@ -112,13 +112,23 @@ func (s *Store) Get(key string) ([]byte, bool) {
 }
 
 // Put stores data under key, replacing any existing value, then enforces the
-// size budget. A value larger than the budget is refused.
+// size budget. A value larger than the budget is refused — but the budget is
+// still enforced on the way out, so lowering it reclaims space even when
+// every subsequent value is too big to store.
 func (s *Store) Put(key string, data []byte) error {
 	path, err := s.path(key)
 	if err != nil {
 		return err
 	}
 	if int64(len(data)) > s.maxBytes {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if evictErr := s.evict(); evictErr != nil {
+			return errors.Join(
+				fmt.Errorf("cache: value for %s is %d bytes, budget is %d", key, len(data), s.maxBytes),
+				evictErr,
+			)
+		}
 		return fmt.Errorf("cache: value for %s is %d bytes, budget is %d", key, len(data), s.maxBytes)
 	}
 

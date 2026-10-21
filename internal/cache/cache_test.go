@@ -135,6 +135,19 @@ var _ = Describe("Store", func() {
 			Expect(ok).To(BeFalse())
 		})
 
+		It("still enforces the budget when it refuses an oversize value", func() {
+			Expect(store.Put("a", make([]byte, 400))).To(Succeed())
+			Expect(store.Put("b", make([]byte, 400))).To(Succeed())
+
+			// A shrunken budget: nothing new fits, but the existing entries
+			// must not stay over it forever.
+			shrunk, err := cache.NewStore(dir, 100)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(shrunk.Put("c", make([]byte, 400))).To(HaveOccurred())
+
+			Expect(sizeOf(dir)).To(BeNumerically("<=", 100))
+		})
+
 		It("keeps the directory within its budget", func() {
 			for _, key := range []string{"a", "b", "c", "d", "e", "f"} {
 				Expect(store.Put(key, make([]byte, 400))).To(Succeed())
