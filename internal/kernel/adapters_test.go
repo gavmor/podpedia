@@ -2,9 +2,11 @@ package kernel
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -109,6 +111,95 @@ func TestStoreWritesLandAtTheRequestedAbsolutePath(t *testing.T) {
 		t.Errorf("%d write(s) landed under the working directory instead of the requested "+
 			"absolute path (cwd-relative mount won): %v", len(strayed), strayed)
 	}
+}
+
+// TestStructuredEntryLandsAsAParseableObject is the wire-format regression.
+//
+// The host used to declare the store request's Entry field as []byte.
+// encoding/json renders a []byte as a base64 *string*, so the plugin — which
+// decodes into json.RawMessage and json.MarshalIndents whatever it finds —
+// wrote the episode's structured artifact as a quoted base64 blob:
+//
+//	"eyJjb21wYW5pZXMiOlt7Im5hbWUiOiJLZXBsZW4gTWluaW5nIn1dfQ=="
+//
+// Every consumer of the engine got that instead of the object the extractor
+// produced. Asserting the file merely parses as JSON is not enough — the
+// broken output is perfectly valid JSON, just the wrong kind — so this
+// insists on an object, and on the extractor's own keys surviving the trip.
+func TestStructuredEntryLandsAsAParseableObject(t *testing.T) {
+	wasm, err := os.ReadFile(storeWasm)
+	if err != nil {
+		t.Skipf("no %s; run `make plugins-build` first (CI does): %v", storeWasm, err)
+	}
+
+	outputDir := t.TempDir()
+	entry := json.RawMessage(`{"companies":[{"name":"Keplen Mining"}],"guests":[{"name":"Boris Keplen"}]}`)
+
+	pk := NewPodpediaKernel("", "", "")
+	pk.Load("store", wasm)
+	store := NewStore(pk)
+
+	ep := types.Episode{ID: "wire-format-probe", Title: "Wire Format Probe", AudioURL: "https://example.com/ep.mp3"}
+	if err := store.SaveStructuredData(context.Background(), nil, outputDir, &ep, entry, "entry"); err != nil {
+		t.Fatalf("SaveStructuredData: %v", err)
+	}
+
+	path := filepath.Join(outputDir, naming.StructuredName(ep.ID, "entry"))
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading %s: %v", path, err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(written, &got); err != nil {
+		var asString string
+		if json.Unmarshal(written, &asString) == nil {
+			t.Fatalf("%s holds a JSON string, not the extracted object — "+
+				"the entry was base64-encoded on the way to the plugin: %s",
+				naming.StructuredName(ep.ID, "entry"), truncate(asString))
+		}
+		t.Fatalf("%s does not parse as a JSON object: %v\ncontents: %s",
+			naming.StructuredName(ep.ID, "entry"), err, truncate(string(written)))
+	}
+
+	var want map[string]any
+	if err := json.Unmarshal(entry, &want); err != nil {
+		t.Fatalf("test fixture is not an object: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("stored entry differs from the one handed to the store:\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// TestStructuredEntryRejectsNonJSON pins the host's end of the contract:
+// entry is JSON, and a value that is not JSON is refused rather than
+// smuggled through as base64. Typed as []byte this call wrote a file
+// containing "bm90IGpzb24gYXQgYWxs" and reported success.
+func TestStructuredEntryRejectsNonJSON(t *testing.T) {
+	wasm, err := os.ReadFile(storeWasm)
+	if err != nil {
+		t.Skipf("no %s; run `make plugins-build` first (CI does): %v", storeWasm, err)
+	}
+
+	outputDir := t.TempDir()
+
+	pk := NewPodpediaKernel("", "", "")
+	pk.Load("store", wasm)
+	store := NewStore(pk)
+
+	ep := types.Episode{ID: "not-json-probe", Title: "Not JSON Probe"}
+	err = store.SaveStructuredData(context.Background(), nil, outputDir, &ep, json.RawMessage("not json at all"), "entry")
+	if err == nil {
+		t.Fatalf("storing a non-JSON entry reported success; wrote: %v", filesUnder(outputDir))
+	}
+}
+
+func truncate(s string) string {
+	const max = 120
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "…"
 }
 
 // shadowRootFor returns the directory a cwd-relative mount would divert

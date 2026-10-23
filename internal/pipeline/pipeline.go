@@ -40,7 +40,15 @@ type AudioDownloader interface {
 
 type Store interface {
 	SaveRawData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode) error
-	SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error
+	// SaveStructuredData writes entry to the episode's structured output
+	// file (see naming.StructuredName).
+	//
+	// entry is json.RawMessage, not []byte, for the same reason
+	// Extractor.ExtractEntities' scheme is: an implementation that hands it
+	// to encoding/json renders a []byte as a base64 string, which is how
+	// every <slug>_<schemeID>.json came to hold a quoted blob instead of the
+	// object the extractor produced.
+	SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry json.RawMessage, schemeID string) error
 }
 
 // ArtifactCache is a persistent store for the expensive outputs of a run —

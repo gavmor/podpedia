@@ -184,22 +184,31 @@ func (s *store) SaveRawData(ctx context.Context, fs afero.Fs, outputDir string, 
 	return err
 }
 
-// SaveStructuredData hands the extractor's output to plugins/store.
+// SaveStructuredData hands the extractor's output to plugins/store, which
+// writes it verbatim to <slug>_<schemeID>.json.
 //
-// Entry is still []byte, and so still reaches the plugin base64-encoded as a
-// JSON string — the same defect this file's extractRequest just lost, in the
-// other direction. It is left alone on purpose: plugins/store writes that
-// value verbatim to <slug>_<scheme>.json, so retyping it to json.RawMessage
-// turns that file from an unparseable string into a real object and makes
-// podpedia-app's PodcastSource.readEntryGraph start populating Document.Graph
-// where it has always returned nil. That is a product change, not a wire fix,
-// and it is the decision parked on podpedia-app card t_298a9c7e.
-func (s *store) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error {
+// Entry is json.RawMessage rather than []byte for the same reason
+// extractRequest.Scheme is: encoding/json renders a []byte as a base64
+// *string*, so an extraction of `{"guests":[]}` left the host as
+// `"entry":"eyJndWVzdHMiOltdfQ=="` and the plugin — which has always decoded
+// into json.RawMessage, and json.MarshalIndents whatever it finds — wrote
+// that quoted base64 blob out as the episode's structured artifact. Every
+// consumer of the engine got a JSON string where the object should be.
+//
+// internal/protocol.StoreStructuredRequest has always declared the field
+// correctly; this struct had drifted from it.
+func (s *store) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry json.RawMessage, schemeID string) error {
+	// A zero-length RawMessage is not valid JSON and would fail the request
+	// marshal outright; nil renders as `null`, which at least round-trips.
+	if len(entry) == 0 {
+		entry = nil
+	}
+
 	req := struct {
-		OutputDir string        `json:"output_dir"`
-		Episode   types.Episode `json:"episode"`
-		Entry     []byte        `json:"entry"`
-		SchemeID  string        `json:"scheme_id"`
+		OutputDir string          `json:"output_dir"`
+		Episode   types.Episode   `json:"episode"`
+		Entry     json.RawMessage `json:"entry"`
+		SchemeID  string          `json:"scheme_id"`
 	}{
 		OutputDir: outputDir,
 		Episode:   *ep,

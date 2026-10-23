@@ -86,7 +86,13 @@ func HandleStructured(in []byte) (string, error) {
 
 	// Write structured data if it doesn't exist
 	if !structuredExists {
-		pretty, _ := json.MarshalIndent(req.Entry, "", "  ")
+		// Checked rather than discarded: req.Entry is whatever the host put
+		// on the wire, and a silently-nil `pretty` here would have
+		// atomicWrite report success over a zero-byte artifact.
+		pretty, err := json.MarshalIndent(req.Entry, "", "  ")
+		if err != nil {
+			return "", fmt.Errorf("entry is not valid JSON: %w", err)
+		}
 		if err := atomicWrite(structuredPath, pretty); err != nil {
 			return "", fmt.Errorf("failed to write structured data: %w", err)
 		}

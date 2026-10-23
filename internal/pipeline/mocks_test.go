@@ -53,7 +53,7 @@ func (m *mockStore) SaveRawData(ctx context.Context, fs afero.Fs, outputDir stri
 	return nil
 }
 
-func (m *mockStore) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error {
+func (m *mockStore) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry json.RawMessage, schemeID string) error {
 	m.StructuredSaved = true
 
 	id := ep.ID

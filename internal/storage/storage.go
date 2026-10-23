@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -34,7 +35,7 @@ func (s *Store) SaveRawData(ctx context.Context, fs afero.Fs, outputDir string, 
 	return afero.WriteFile(fs, fileName, []byte(ep.Transcript), 0644)
 }
 
-func (s *Store) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error {
+func (s *Store) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry json.RawMessage, schemeID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

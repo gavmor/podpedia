@@ -100,7 +100,7 @@ func (s *writingStore) SaveRawData(ctx context.Context, fs afero.Fs, outputDir s
 	return afero.WriteFile(fs, filepath.Join(outputDir, naming.RawName(ep.ID)), []byte(ep.Transcript), 0o644)
 }
 
-func (s *writingStore) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry []byte, schemeID string) error {
+func (s *writingStore) SaveStructuredData(ctx context.Context, fs afero.Fs, outputDir string, ep *types.Episode, entry json.RawMessage, schemeID string) error {
 	if err := fs.MkdirAll(outputDir, 0o755); err != nil {
 		return err
 	}
