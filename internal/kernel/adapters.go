@@ -19,11 +19,35 @@ type PodpediaKernel struct {
 	TranscribeURL string
 }
 
+// AllowedPaths is the host→guest filesystem mount policy every plugin runs
+// under. Mounting all of "/" read-write into every WASM stage is deliberately
+// permissive — tightening it is a separate hardening question — but it has to
+// be unambiguous.
+//
+// It must stay unambiguous because the Extism SDK applies this map by ranging
+// over it (extism/go-sdk plugin.go, `for host, guest := range
+// p.manifest.AllowedPaths`) and Go randomises map iteration order. Two
+// entries resolving to the same guest path are therefore not redundant: the
+// winner is drawn afresh on every Kernel.Call.
+//
+// This used to read {"/": "/", ".": "."}. wazero normalises the guest path
+// "." to "/", so both entries claimed the guest root, and a plugin writing
+// /tmp/podpedia_workspace/ep_raw.txt landed there or at
+// <cwd>/tmp/podpedia_workspace/ep_raw.txt at random, per call — reporting
+// success either way, so the only symptom a caller saw was output that went
+// missing about half the time.
+//
+// A cwd-relative mount, if one is ever wanted, needs a guest path no other
+// entry claims (".": "/work", say) — never a second route to the guest root.
+func AllowedPaths() map[string]string {
+	return map[string]string{"/": "/"}
+}
+
 func NewPodpediaKernel(ollamaURL, ollamaModel, transcribeURL string) *PodpediaKernel {
 	// Policy: Allow everything for now to ensure stability, can be tightened later.
 	k := host.NewKernel(host.Config{
 		AllowedHosts: []string{"*"},
-		AllowedPaths: map[string]string{"/": "/", ".": "."},
+		AllowedPaths: AllowedPaths(),
 	})
 
 	return &PodpediaKernel{
